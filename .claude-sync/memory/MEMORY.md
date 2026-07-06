@@ -5,6 +5,7 @@
 - [Phase 3 Storage Engine decisions](project_phase3_storage_engine.md) — VFS/IndexedDB/OPFS adapters, project schema v1, migration runner, backup-before-migrate (restore API still open), asset/thumbnail/waveform caches
 - [Phase 4 Layer Engine decisions](project_phase4_layer_engine.md) — LayerRegistry/CompositionGraph/generic Hierarchy primitive (ADR-005), 7 layer-type factories, delete-cascade left open (flagged with ADR-010)
 - [Phase 5 Timeline Engine decisions](project_phase5_timeline_engine.md) — Composition/Track/TrackItem in shared, TimelineEngine invariants (no-overlap), Playhead driven by Core's Scheduler, first ICommand impls, ADR-010 still open (single-track ripple only)
+- [Phase 6 Animation Engine decisions](project_phase6_animation_engine.md) — Keyframe/PropertyTrack/AnimationClip in shared, AnimatablePropertyRegistry keyed by (LayerType, propertyKey), cubic-bezier easing, SegmentLocator incremental eval, multi-clip blending still open (ADR-005 #3)
 - [Phase 1 scaffold decisions](project_phase1_scaffold_decisions.md) — Conventions set where docs were stubs: npm scope, minimal I*Engine interfaces, ExportPreset, import-boundary gaps
 - [Phase 0 spike findings](project_phase0_spike_findings.md) — Export pipeline passed (Mediabunny replaces mp4box.js/mp4-muxer, ADR-012); TTS pipeline confirmed but 14s generate time misses <5s target
 - [Architecture non-negotiables](project_architecture_rules.md) — UI/engine separation, Tick time, Frame State invariant, VFS-only storage access
