@@ -142,22 +142,22 @@ UX built around near-instant generation.
 
 ---
 
-## Phase 4 — Layer Engine (`packages/layer`)
+## Phase 4 — Layer Engine (`packages/layer`) ✅ complete (2026-07-06)
 
 ### 4.1 Base layer
 
-- [ ] `ILayer` base (id, type, name, transform, opacity, visible, locked)
-- [ ] `IAnimatableLayer` — layers that participate in keyframe animation
-- [ ] `Composition Graph` primitive — persistent parent/child hierarchy with visibility/lock inheritance
+- [x] `ILayer` base (id, type, name, transform, opacity, visible, locked) — was already scaffolded in `@motion-studio/shared` (Phase 1); `parentId` added for Composition Graph
+- [x] `IAnimatableLayer` — layers that participate in keyframe animation (currently an alias for `ILayerBase` — every layer type qualifies today; see `docs/08-layer-engine/overview.md`)
+- [x] `Composition Graph` primitive — persistent parent/child hierarchy with visibility/lock inheritance (`CompositionGraph`, built on the generic `Hierarchy<TId>` primitive in `@motion-studio/shared`, ADR-005 #2)
 
 ### 4.2 Layer types (implement in this order)
 
-- [ ] `VideoLayer` (source assetId, in/out points, playback rate)
-- [ ] `TextLayer` (content, font, size, color, alignment, wrapping)
-- [ ] `ImageLayer` (source assetId, fit mode)
-- [ ] `ShapeLayer` (path, fill, stroke, corner radius)
-- [ ] `AudioLayer` (source assetId, volume, in/out points)
-- [ ] `GroupLayer` (children: LayerId[], Composition Graph node)
+- [x] `VideoLayer` (source assetId, in/out points, playback rate) — in/out points live on Timeline's `TrackItem`, not the Layer, per ARCHITECTURE.md §3
+- [x] `TextLayer` (content, font, size, color, alignment, wrapping) — wrapping/kerning/stroke/shadow/gradient deferred, see `docs/08-layer-engine/text-layer.md` open questions
+- [x] `ImageLayer` (source assetId, fit mode)
+- [x] `ShapeLayer` (path, fill, stroke, corner radius) — polygon/star point counts and bezier path data not yet modeled, see doc
+- [x] `AudioLayer` (source assetId, volume, in/out points) — in/out points on `TrackItem`, as above
+- [x] `GroupLayer` (children: LayerId[], Composition Graph node)
 
 ---
 
@@ -429,21 +429,21 @@ Uses findings from **Spike B** — do not implement full TTS pipeline until Spik
 
 ## Milestones summary
 
-| Milestone | Gate condition                                                           |
-| --------- | ------------------------------------------------------------------------ |
-| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)               |
-| **M1**    | Monorepo scaffold + shared types compiling                               |
-| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)   |
-| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)        |
-| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export) |
-| **M5**    | All layer types, full Timeline edit ops, Animation Engine                |
-| **M6**    | Rendering: WebGPU + WebGL2 fallback, Effects Engine                      |
-| **M7**    | Audio Engine preview + export, full Export presets                       |
-| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)   |
-| **M9**    | AI Engine: TTS in timeline, export with voice                            |
-| **M10**   | Plugin System live, built-in tools as plugins                            |
-| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)     |
-| **M12**   | PWA (offline, installable), CI/CD, release pipeline                      |
+| Milestone | Gate condition                                                                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)                                                                                                                           |
+| **M1**    | Monorepo scaffold + shared types compiling                                                                                                                                           |
+| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                               |
+| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                    |
+| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine prerequisite ✅ done (2026-07-06); Timeline/Rendering/Export/History/Canvas UI still pending. |
+| **M5**    | All layer types, full Timeline edit ops, Animation Engine                                                                                                                            |
+| **M6**    | Rendering: WebGPU + WebGL2 fallback, Effects Engine                                                                                                                                  |
+| **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                   |
+| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                               |
+| **M9**    | AI Engine: TTS in timeline, export with voice                                                                                                                                        |
+| **M10**   | Plugin System live, built-in tools as plugins                                                                                                                                        |
+| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)                                                                                                                 |
+| **M12**   | PWA (offline, installable), CI/CD, release pipeline                                                                                                                                  |
 
 ---
 

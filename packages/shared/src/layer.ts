@@ -77,3 +77,14 @@ export interface IGroupLayer extends ILayerBase {
 
 export type ILayer =
   IVideoLayer | IImageLayer | IAudioLayer | ITextLayer | IStickerLayer | IShapeLayer | IGroupLayer;
+
+/**
+ * Layers whose properties the Animation Engine (Phase 6,
+ * `AnimatablePropertyRegistry`) may attach keyframe tracks to. Every
+ * current layer type qualifies today — `transform` and `opacity` on
+ * `ILayerBase` are the baseline animatable surface for all of them. Kept
+ * as its own alias (rather than reusing `ILayer` at call sites) so a
+ * future layer type that opts out doesn't require touching every
+ * consumer that only cares "is this animatable".
+ */
+export type IAnimatableLayer = ILayerBase;
