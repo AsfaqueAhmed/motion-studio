@@ -161,30 +161,35 @@ UX built around near-instant generation.
 
 ---
 
-## Phase 5 — Timeline Engine (`packages/timeline`)
+## Phase 5 — Timeline Engine (`packages/timeline`) ✅ complete (2026-07-06)
 
 ### 5.1 Data model
 
-- [ ] `Composition` (id, name, width, height, fps, durationTicks, tracks[])
-- [ ] `Track` (id, type, label, locked, muted, items[])
-- [ ] `TrackItem` (id, trackId, layerId, startTick, durationTicks, trimInTick, trimOutTick)
-- [ ] All temporal values in integer **Ticks** — no floats
+- [x] `Composition` (id, name, width, height, fps, durationTicks, tracks[])
+- [x] `Track` (id, type, label, locked, muted, items[])
+- [x] `TrackItem` (id, trackId, layerId, startTick, durationTicks, trimInTick, trimOutTick)
+- [x] All temporal values in integer **Ticks** — no floats
 
 ### 5.2 Playback
 
-- [ ] Tick-based playhead (integer only)
-- [ ] `play() / pause() / seek(tick) / stop()`
-- [ ] Loop in/out points
-- [ ] Frame-step forward/back
+- [x] Tick-based playhead (integer only) — `Playhead`, driven externally by Core's `Scheduler` rather than running its own raf loop, see `docs/07-timeline-engine/playback.md`
+- [x] `play() / pause() / seek(tick) / stop()`
+- [x] Loop in/out points
+- [x] Frame-step forward/back
 
 ### 5.3 Edit operations (all go through History as Commands)
 
-- [ ] Move TrackItem (`MoveTrackItemCommand`)
-- [ ] Trim in/out (`TrimTrackItemCommand`)
-- [ ] Split at playhead (`SplitTrackItemCommand`)
-- [ ] Delete (`DeleteTrackItemCommand`)
-- [ ] Ripple delete/insert (`RippleDeleteCommand`) — **flag ADR-010 before implementing linked-item behavior**
-- [ ] Snapping (to playhead, to other clip edges, to grid)
+- [x] Move TrackItem (`MoveTrackItemCommand`)
+- [x] Trim in/out (`TrimTrackItemCommand`) — single-item trim only; ripple trim/slip/slide not implemented, see `docs/07-timeline-engine/trimming.md`
+- [x] Split at playhead (`SplitTrackItemCommand`)
+- [x] Delete (`DeleteTrackItemCommand`)
+- [x] Ripple delete/insert (`RippleDeleteCommand`) — ripple delete only (no insert), single-track only; **ADR-010 still open**, cross-track linked-item ripple deferred until `ITrackItem` models linking, see `docs/07-timeline-engine/ripple.md`
+- [x] Snapping (to playhead, to other clip edges, to grid) — pure calculation (`snapping.ts`), not a Command; markers/guides deferred, see `docs/07-timeline-engine/snapping.md`
+
+Note: Phase 11 (History Engine) doesn't exist yet, so these Commands are
+standalone `ICommand` implementations, ready to be pushed onto History's
+undo/redo stacks once it's built — same latitude Phase 4 had with no
+Command Bus wired up yet.
 
 ---
 
@@ -429,21 +434,21 @@ Uses findings from **Spike B** — do not implement full TTS pipeline until Spik
 
 ## Milestones summary
 
-| Milestone | Gate condition                                                                                                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)                                                                                                                           |
-| **M1**    | Monorepo scaffold + shared types compiling                                                                                                                                           |
-| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                               |
-| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                    |
-| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine prerequisite ✅ done (2026-07-06); Timeline/Rendering/Export/History/Canvas UI still pending. |
-| **M5**    | All layer types, full Timeline edit ops, Animation Engine                                                                                                                            |
-| **M6**    | Rendering: WebGPU + WebGL2 fallback, Effects Engine                                                                                                                                  |
-| **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                   |
-| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                               |
-| **M9**    | AI Engine: TTS in timeline, export with voice                                                                                                                                        |
-| **M10**   | Plugin System live, built-in tools as plugins                                                                                                                                        |
-| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)                                                                                                                 |
-| **M12**   | PWA (offline, installable), CI/CD, release pipeline                                                                                                                                  |
+| Milestone | Gate condition                                                                                                                                                                                                   |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)                                                                                                                                                       |
+| **M1**    | Monorepo scaffold + shared types compiling                                                                                                                                                                       |
+| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                                                           |
+| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                                                |
+| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine ✅ (2026-07-06) and Timeline Engine ✅ (2026-07-06) prerequisites done; Rendering/Export/History/Canvas UI still pending. |
+| **M5**    | ✅ All layer types, full Timeline edit ops (2026-07-06) — Animation Engine still pending                                                                                                                         |
+| **M6**    | Rendering: WebGPU + WebGL2 fallback, Effects Engine                                                                                                                                                              |
+| **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                                               |
+| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                                                           |
+| **M9**    | AI Engine: TTS in timeline, export with voice                                                                                                                                                                    |
+| **M10**   | Plugin System live, built-in tools as plugins                                                                                                                                                                    |
+| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)                                                                                                                                             |
+| **M12**   | PWA (offline, installable), CI/CD, release pipeline                                                                                                                                                              |
 
 ---
 

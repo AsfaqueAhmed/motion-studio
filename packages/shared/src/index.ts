@@ -2,6 +2,7 @@ export * from "./tick";
 export * from "./ids";
 export * from "./enums";
 export * from "./layer";
+export * from "./timeline";
 export * from "./hierarchy";
 export * from "./frame-state";
 export * from "./command";
