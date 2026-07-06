@@ -89,32 +89,32 @@ UX built around near-instant generation.
 
 ---
 
-## Phase 2 — Core Engine (`packages/core`)
+## Phase 2 — Core Engine (`packages/core`) ✅ complete (2026-07-06)
 
 ### 2.1 Kernel & DI
 
-- [ ] `AppEngine` — top-level bootstrap, owns engine lifecycle
-- [ ] Lightweight DI container (constructor injection, no decorators required)
-- [ ] `ServiceLocator` — global registry for resolved engine instances
-- [ ] Engine lifecycle: `initialize() → ready() → dispose()`
+- [x] `AppEngine` — top-level bootstrap, owns engine lifecycle
+- [x] Lightweight DI container (constructor injection, no decorators required)
+- [x] `ServiceLocator` — global registry for resolved engine instances
+- [x] Engine lifecycle: `initialize() → ready() → dispose()`
 
 ### 2.2 Event Bus
 
-- [ ] Typed `EventBus` (publish/subscribe, synchronous + async variants)
-- [ ] All events strongly typed against the shared event catalog
-- [ ] No wildcard subscriptions — every listener declares its exact event type
+- [x] Typed `EventBus` (publish/subscribe, synchronous + async variants)
+- [x] All events strongly typed against the shared event catalog
+- [x] No wildcard subscriptions — every listener declares its exact event type
 
 ### 2.3 Scheduler
 
-- [ ] `raf`-based tick scheduler for preview loop
-- [ ] Tick → frame number conversion utility (respects project tick resolution)
-- [ ] Pause/resume/seek
+- [x] `raf`-based tick scheduler for preview loop
+- [x] Tick → frame number conversion utility (respects project tick resolution)
+- [x] Pause/resume/seek
 
 ### 2.4 Worker Manager
 
-- [ ] `WorkerManager` — owns all dedicated workers, routes messages
-- [ ] Workers never communicate directly with each other (always via Core)
-- [ ] Initial worker slots: rendering, export, ai-inference, thumbnail-gen
+- [x] `WorkerManager` — owns all dedicated workers, routes messages
+- [x] Workers never communicate directly with each other (always via Core)
+- [x] Initial worker slots: rendering, export, ai-inference, thumbnail-gen
 
 ---
 
@@ -433,7 +433,7 @@ Uses findings from **Spike B** — do not implement full TTS pipeline until Spik
 | --------- | ------------------------------------------------------------------------ |
 | **M0**    | ✅ Both spikes complete with written findings (2026-07-06)               |
 | **M1**    | Monorepo scaffold + shared types compiling                               |
-| **M2**    | Core Engine: DI, event bus, scheduler, workers running                   |
+| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)   |
 | **M3**    | Storage: VFS, project save/load, asset OPFS store                        |
 | **M4**    | Vertical slice: import → trim → move → undo → export (preview == export) |
 | **M5**    | All layer types, full Timeline edit ops, Animation Engine                |
