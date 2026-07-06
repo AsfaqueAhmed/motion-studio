@@ -1,0 +1,32 @@
+import type { LayerType } from "./enums";
+import type { CompositionId, LayerId } from "./ids";
+import type { ITransform2D } from "./layer";
+import type { Tick } from "./tick";
+
+/**
+ * One Layer's fully-evaluated state at a given tick: Layer data + Animation
+ * evaluation already applied. See ARCHITECTURE.md §4.
+ */
+export interface IFrameStateLayer {
+  readonly layerId: LayerId;
+  readonly type: LayerType;
+  readonly transform: ITransform2D;
+  readonly opacity: number;
+  readonly zIndex: number;
+  readonly properties: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * Immutable, deterministic snapshot of everything visible/audible/active at
+ * a given tick. Produced by evaluating Timeline + Animation + Layer data
+ * together; consumed identically by the Rendering Engine (preview) and the
+ * Export Engine (offline render) — this identity is what guarantees
+ * preview == export. See ARCHITECTURE.md §4 and GLOSSARY.md "Frame State".
+ */
+export interface IFrameState {
+  readonly tick: Tick;
+  readonly compositionId: CompositionId;
+  readonly width: number;
+  readonly height: number;
+  readonly layers: ReadonlyArray<IFrameStateLayer>;
+}

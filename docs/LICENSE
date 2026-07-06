@@ -1,0 +1,13 @@
+LICENSE — TBD
+
+No license has been chosen yet for this project. Add one before any
+public release or distribution. Common choices for a project like this:
+
+- MIT / Apache-2.0 — permissive, if third-party/plugin ecosystem growth
+  is a priority.
+- A source-available or proprietary license — if this is intended as a
+  commercial product first.
+
+This placeholder intentionally makes no assumption about which; update
+this file with an explicit decision before it matters (e.g. before
+publishing the repository or accepting outside contributions).

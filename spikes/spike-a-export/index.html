@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Spike A — Export Pipeline</title>
+  </head>
+  <body>
+    <h1>Spike A — Export Pipeline</h1>
+    <p>Decode → render (canvas overlay) → encode → mux → playback</p>
+    <p>Opus run:</p>
+    <video id="output-opus" controls width="480"></video>
+    <p>AAC run:</p>
+    <video id="output-aac" controls width="480"></video>
+    <pre id="log" style="white-space: pre-wrap; font-family: monospace; font-size: 12px"></pre>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
