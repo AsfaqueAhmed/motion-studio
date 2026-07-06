@@ -118,27 +118,27 @@ UX built around near-instant generation.
 
 ---
 
-## Phase 3 — Storage Engine (`packages/storage`)
+## Phase 3 — Storage Engine (`packages/storage`) ✅ complete (2026-07-06)
 
 ### 3.1 VFS abstraction
 
-- [ ] `IVFS` interface — `read / write / delete / exists / list`
-- [ ] IndexedDB adapter (structured/small data: project JSON, settings, thumbnails)
-- [ ] OPFS adapter (large binaries: media files, AI models, exports)
-- [ ] `StorageEngine` — routes reads/writes to correct adapter via path convention
+- [x] `IVFS` interface — `read / write / delete / exists / list`
+- [x] IndexedDB adapter (structured/small data: project JSON, settings, thumbnails)
+- [x] OPFS adapter (large binaries: media files, AI models, exports)
+- [x] `StorageEngine` — routes reads/writes to correct adapter via path convention
 
 ### 3.2 Project persistence
 
-- [ ] Project schema v1 (Composition, Tracks, TrackItems, Layer refs)
-- [ ] `save(project)` / `load(projectId)` / `list()` / `delete(projectId)`
-- [ ] **Backup-before-migrate** step (write backup before any schema migration — open risk)
-- [ ] Schema version field + migration runner
+- [x] Project schema v1 (Composition, Tracks, TrackItems, Layer refs)
+- [x] `save(project)` / `load(projectId)` / `list()` / `delete(projectId)`
+- [x] **Backup-before-migrate** step (write backup before any schema migration — open risk) — backup half done; restore/rollback API still open, see `docs/12-storage/project-schema.md`
+- [x] Schema version field + migration runner
 
 ### 3.3 Asset cache
 
-- [ ] Asset blob storage in OPFS (keyed by content hash for dedup)
-- [ ] Thumbnail cache (IndexedDB, keyed by `assetId + timestamp`)
-- [ ] Waveform cache (IndexedDB)
+- [x] Asset blob storage in OPFS (keyed by content hash for dedup)
+- [x] Thumbnail cache (IndexedDB, keyed by `assetId + timestamp`)
+- [x] Waveform cache (IndexedDB)
 
 ---
 
@@ -434,7 +434,7 @@ Uses findings from **Spike B** — do not implement full TTS pipeline until Spik
 | **M0**    | ✅ Both spikes complete with written findings (2026-07-06)               |
 | **M1**    | Monorepo scaffold + shared types compiling                               |
 | **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)   |
-| **M3**    | Storage: VFS, project save/load, asset OPFS store                        |
+| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)        |
 | **M4**    | Vertical slice: import → trim → move → undo → export (preview == export) |
 | **M5**    | All layer types, full Timeline edit ops, Animation Engine                |
 | **M6**    | Rendering: WebGPU + WebGL2 fallback, Effects Engine                      |
