@@ -329,14 +329,20 @@ section.
 
 ---
 
-## Phase 11 — History Engine (`packages/history`)
+## Phase 11 — History Engine (`packages/history`) ✅ complete (2026-07-07)
 
-- [ ] `HistoryEngine` — two stacks: undo, redo
-- [ ] `ICommand` interface: `execute() / undo() / redo() / description`
-- [ ] Composite commands (multi-command transactions as one undo step)
-- [ ] Max history depth (configurable, default 100)
-- [ ] **Layout undo is a separate stack** (ADR-011) — panel/dock changes don't mix with project history
-- [ ] History cleared on project load
+- [x] `HistoryEngine` — two stacks: undo, redo — `HistoryEngine implements IHistoryEngine`, see `docs/15-history/overview.md`
+- [x] `ICommand` interface: `execute() / undo() / redo() / description` — already existed in `@motion-studio/shared` (`command.ts`) since Phase 5/6 built real `ICommand`s ahead of History existing; `label` is this project's "description", see `docs/15-history/command-pattern.md`
+- [x] Composite commands (multi-command transactions as one undo step) — `CompositeCommand` (`src/commands/composite-command.ts`); bundles a literal Command sequence, not a re-runnable Intent — "macro recording granularity" open question in `overview.md` resolved in favor of the simpler/brittle option for now
+- [x] Max history depth (configurable, default 100) — `HistoryEngine` constructor option `maxDepth`, oldest undo entry dropped on overflow
+- [x] **Layout undo is a separate stack** (ADR-011) — `LayoutHistoryStack` (`src/layout-history.ts`), a distinct class/instance from `HistoryEngine`, minimal per the ADR: tracks only the single most recent layout change (no deep stack)
+- [x] History cleared on project load — `HistoryEngine.clear()`; not self-wired to the `ProjectLoaded` event since no cross-engine event wiring exists yet anywhere in the codebase (same gap as Rendering's Render Graph / Effects backend wiring) — the future Editor Service layer calls it
+
+Note: `CommandExecuted`/`CommandUndone`/`CommandRedone` events already existed
+in `@motion-studio/shared`'s event catalog (added speculatively during an
+earlier phase); `HistoryEngine` emits them through an injected
+`IHistoryEventSink`, matching Export's `IExportEventSink` DI pattern — no
+direct `EventBus` dependency.
 
 ---
 

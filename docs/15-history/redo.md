@@ -1,14 +1,19 @@
 # Redo
 
-> Status: Stub — scaffolded from project planning history, pending detailed spec.
+> Status: Implemented (Phase 11, 2026-07-07). See `packages/history/src/history-engine.ts`.
 
-Redo stack semantics and invalidation on new command after undo.
+`HistoryEngine.redo()` pops the top of the redo stack, calls
+`command.redo()`, then pushes that command back onto the undo stack
+(re-applying `maxDepth` trimming, same as a fresh `execute()`). Throws
+`"HistoryEngine: nothing to redo"` on an empty stack.
 
-## Scope
+## Invalidation on new command after undo
 
-_TODO: expand this document. See `../ARCHITECTURE.md` and `../DECISIONS.md` for the
-architectural rules and open decisions that constrain what goes here._
+Calling `execute(command)` after one or more `undo()` calls clears the
+entire redo stack (`this.redoStack.length = 0`) — standard undo/redo
+semantics, matching every mainstream editor. There is no branching
+history; the discarded redo entries are gone, not preserved on a side
+branch.
 
-## Open questions
-
-_TODO_
+`LayoutHistoryStack.execute()` does the same thing at its one-slot scale:
+a new layout change after an undo discards the single tracked redo slot.
