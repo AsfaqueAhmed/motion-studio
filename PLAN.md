@@ -193,29 +193,33 @@ Command Bus wired up yet.
 
 ---
 
-## Phase 6 — Animation Engine (`packages/animation`)
+## Phase 6 — Animation Engine (`packages/animation`) ✅ complete (2026-07-06)
 
 ### 6.1 Property system
 
-- [ ] `AnimatablePropertyRegistry` — registers animatable properties per layer type (type, default, interpolator, validator)
-- [ ] Plugin extension point for custom properties
+- [x] `AnimatablePropertyRegistry` — registers animatable properties per layer type (type, default, interpolator, validator)
+- [x] Plugin extension point for custom properties — `registry.register()` itself; a plugin calls it directly, no separate API needed
 
 ### 6.2 Keyframes
 
-- [ ] `Keyframe` (tick, value, easing: Bezier | Step | Linear)
-- [ ] Per-property keyframe track
-- [ ] Add / move / delete / modify keyframe (all via Commands)
+- [x] `Keyframe` (tick, value, easing: Bezier | Step | Linear) — `IKeyframe` in `@motion-studio/shared`; identified by tick within its track (no separate `KeyframeId`), see `docs/06-animation-engine/keyframes.md`
+- [x] Per-property keyframe track — `IPropertyTrack`
+- [x] Add / move / delete / modify keyframe (all via Commands) — `AddKeyframeCommand`/`MoveKeyframeCommand`/`DeleteKeyframeCommand`/`ModifyKeyframeCommand`
 
 ### 6.3 Interpolation
 
-- [ ] Linear, Bezier (cubic), Step (hold) interpolators
-- [ ] Easing library (ease-in, ease-out, ease-in-out, custom Bezier)
-- [ ] Multi-clip property blending (evaluation order — ADR-005 DAG primitive)
+- [x] Linear, Bezier (cubic), Step (hold) interpolators
+- [x] Easing library (ease-in, ease-out, ease-in-out, custom Bezier) — bounce/elastic/back deferred (not expressible as a single cubic-bezier), see `docs/06-animation-engine/easing.md`
+- [ ] Multi-clip property blending (evaluation order — ADR-005 DAG primitive) — **not implemented, still an open decision** (`AnimationEngine.addClip` throws on a second Clip per Layer); see `docs/06-animation-engine/overview.md` "Multi-clip blending"
 
 ### 6.4 Evaluation
 
-- [ ] `evaluateAt(layerId, propertyKey, tick) → value`
-- [ ] Incremental evaluation (only re-compute changed properties per tick)
+- [x] `evaluateAt(layerId, propertyKey, tick) → value`
+- [x] Incremental evaluation (only re-compute changed properties per tick) — `SegmentLocator` caches the last resolved keyframe pair per track, skipping the binary search when the tick stays in the same segment; see `docs/06-animation-engine/animation-player.md`
+
+Note: as with Phase 5, there is no History Engine yet (Phase 11), so
+these four Commands are standalone `ICommand` implementations, ready to
+be pushed onto History's undo/redo stacks once it's built.
 
 ---
 
@@ -441,7 +445,7 @@ Uses findings from **Spike B** — do not implement full TTS pipeline until Spik
 | **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                                                           |
 | **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                                                |
 | **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine ✅ (2026-07-06) and Timeline Engine ✅ (2026-07-06) prerequisites done; Rendering/Export/History/Canvas UI still pending. |
-| **M5**    | ✅ All layer types, full Timeline edit ops (2026-07-06) — Animation Engine still pending                                                                                                                         |
+| **M5**    | ✅ All layer types, full Timeline edit ops (2026-07-06), Animation Engine (2026-07-06) — multi-clip blending still open (ADR-005 #3)                                                                             |
 | **M6**    | Rendering: WebGPU + WebGL2 fallback, Effects Engine                                                                                                                                                              |
 | **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                                               |
 | **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                                                           |

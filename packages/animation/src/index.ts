@@ -1,1 +1,14 @@
-export {};
+export * from "./property-definition";
+export * from "./property-registry";
+export * from "./interpolators";
+export * from "./easing";
+export * from "./builtin-properties";
+export * from "./animation-clip-registry";
+export * from "./property-track-registry";
+export * from "./animation-factory";
+export * from "./evaluator";
+export * from "./animation-engine";
+export * from "./commands/add-keyframe-command";
+export * from "./commands/move-keyframe-command";
+export * from "./commands/delete-keyframe-command";
+export * from "./commands/modify-keyframe-command";

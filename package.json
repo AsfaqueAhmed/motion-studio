@@ -15,7 +15,9 @@
     "test:e2e": "turbo run test:e2e",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "claude:push": "bash scripts/claude-sync/push.sh",
+    "claude:pull": "bash scripts/claude-sync/pull.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",

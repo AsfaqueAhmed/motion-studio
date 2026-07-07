@@ -1,14 +1,38 @@
 # Animation Player
 
-> Status: Stub — scaffolded from project planning history, pending detailed spec.
+There is no separate "AnimationPlayer" class — evaluation lives directly
+on `AnimationEngine` (`evaluateAt`) plus two small collaborators in
+`packages/animation/src/evaluator.ts`:
 
-Evaluates active clips/tracks only; binary search for nearest keyframes, O(log n).
+- `SegmentLocator` — finds the two keyframes bounding a tick in a sorted,
+  tick-unique keyframe array.
+- `evaluateSegment` — turns a located segment + tick + `IPropertyDefinition`
+  into a value.
 
-## Scope
+## Incremental evaluation
 
-_TODO: expand this document. See `../ARCHITECTURE.md` and `../DECISIONS.md` for the
-architectural rules and open decisions that constrain what goes here._
+`SegmentLocator` caches the last resolved keyframe-pair index per
+Property Track (`AnimationEngine` holds one `SegmentLocator` per
+`PropertyTrackId`). On the next call:
 
-## Open questions
+- If the new tick still falls within `[cachedLeft.tick, cachedRight.tick)`,
+  it reuses the cached pair — **no binary search**.
+- Otherwise it re-runs a binary search (`O(log n)`) and updates the cache.
 
-_TODO_
+During normal playback, `evaluateAt` calls arrive with monotonically
+increasing ticks one frame apart, almost always landing back in the same
+segment — this is the common case the cache optimizes for. Any keyframe
+mutation on a track (`addKeyframe`/`moveKeyframe`/`deleteKeyframe`/
+`modifyKeyframe`) calls `SegmentLocator.invalidate()` for that track so a
+stale cached index is never read after an edit.
+
+This does **not** yet address "only re-compute changed properties" across
+a whole Frame State (skipping Layers/properties with no Clip at all,
+etc.) — that's the caller's job per `timeline-binding.md`, not something
+`AnimationEngine` tracks globally today.
+
+## Binary search
+
+`O(log n)` over the sorted keyframe array, matching `overview.md`'s "100,000
+keyframes at 60fps" goal — see `SegmentLocator.binarySearch` (finds the
+largest index `i` such that `keyframes[i].tick <= tick`).

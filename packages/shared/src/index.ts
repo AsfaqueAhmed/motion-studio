@@ -3,6 +3,7 @@ export * from "./ids";
 export * from "./enums";
 export * from "./layer";
 export * from "./timeline";
+export * from "./animation";
 export * from "./hierarchy";
 export * from "./frame-state";
 export * from "./command";
