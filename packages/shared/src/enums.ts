@@ -91,3 +91,37 @@ export enum PluginLifecycleState {
   Initializing = "Initializing",
   Ready = "Ready",
 }
+
+/** See docs/09-effects-engine/overview.md */
+export enum EffectType {
+  GaussianBlur = "GaussianBlur",
+  Glow = "Glow",
+  DropShadow = "DropShadow",
+  BlendMode = "BlendMode",
+  ColorAdjustment = "ColorAdjustment",
+  Transition = "Transition",
+}
+
+/** See docs/09-effects-engine/blend-modes.md — matches CSS `mix-blend-mode` names 1:1 where one exists. */
+export enum BlendMode {
+  Normal = "Normal",
+  Multiply = "Multiply",
+  Screen = "Screen",
+  Overlay = "Overlay",
+  SoftLight = "SoftLight",
+  HardLight = "HardLight",
+  Difference = "Difference",
+  Darken = "Darken",
+  Lighten = "Lighten",
+  ColorDodge = "ColorDodge",
+  ColorBurn = "ColorBurn",
+}
+
+/** See docs/09-effects-engine/transitions.md */
+export enum TransitionType {
+  CrossDissolve = "CrossDissolve",
+  WipeLeft = "WipeLeft",
+  WipeRight = "WipeRight",
+  WipeUp = "WipeUp",
+  WipeDown = "WipeDown",
+}

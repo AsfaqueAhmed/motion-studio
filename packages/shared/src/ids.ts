@@ -8,6 +8,7 @@ export type AssetId = Brand<string, "AssetId">;
 export type ProjectId = Brand<string, "ProjectId">;
 export type AnimationClipId = Brand<string, "AnimationClipId">;
 export type PropertyTrackId = Brand<string, "PropertyTrackId">;
+export type EffectNodeId = Brand<string, "EffectNodeId">;
 
 export function createLayerId(value: string): LayerId {
   return value as LayerId;
@@ -39,4 +40,8 @@ export function createAnimationClipId(value: string): AnimationClipId {
 
 export function createPropertyTrackId(value: string): PropertyTrackId {
   return value as PropertyTrackId;
+}
+
+export function createEffectNodeId(value: string): EffectNodeId {
+  return value as EffectNodeId;
 }

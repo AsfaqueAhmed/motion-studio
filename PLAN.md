@@ -259,16 +259,21 @@ be pushed onto History's undo/redo stacks once it's built.
 
 ---
 
-## Phase 8 — Effects Engine (`packages/effects`)
+## Phase 8 — Effects Engine (`packages/effects`) ✅ complete (2026-07-07)
 
-- [ ] Effect node interface: `IEffectNode` (inputs, outputs, WGSL shader, GLSL shader)
-- [ ] Blur (Gaussian)
-- [ ] Glow
-- [ ] Drop shadow
-- [ ] Blend modes (multiply, screen, overlay, etc.)
-- [ ] Color adjustments (brightness, contrast, saturation, hue)
-- [ ] CSS filters as Canvas2D fallback for effects
-- [ ] Transition effects (cross-dissolve, wipe, etc.)
+- [x] Effect node interface: `IEffectNode` (inputs, outputs, WGSL shader, GLSL shader) — `effect-node.ts`; structurally compatible with Rendering's `IRenderGraphNode` (`id` + `dependencyIds`) without importing it, per engine-boundary rule
+- [x] Blur (Gaussian) — real two-pass separable blur (`createGaussianBlurPair`), weights baked as shader constants, see `docs/09-effects-engine/blur.md`
+- [x] Glow — 4-node chain (bright-pass → blur → additive composite), see `docs/09-effects-engine/glow.md`
+- [x] Drop shadow — 4-node chain (silhouette → blur → composite-under), see `docs/09-effects-engine/shadow.md`
+- [x] Blend modes (multiply, screen, overlay, etc.) — all 11 modes (Normal + 10), two-input nodes, see `docs/09-effects-engine/blend-modes.md`
+- [x] Color adjustments (brightness, contrast, saturation, hue) — plus temperature/tint from the doc stub's original scope, see `docs/09-effects-engine/color-adjustments.md`
+- [x] CSS filters as Canvas2D fallback for effects — `css-filter-chain.ts`'s `composeCssFilterChain`, reports unsupported nodes rather than silently degrading, see `docs/09-effects-engine/filters.md`
+- [x] Transition effects (cross-dissolve, wipe, etc.) — cross-dissolve + 4-direction wipe, two-input nodes driven by a `progress` Timeline computes (Effects never reads Timeline state), see `docs/09-effects-engine/transitions.md`
+
+Note: no backend wiring yet — nothing calls a backend's `drawFrame` with a
+non-identity `RenderGraph` built from these nodes; that integration (plus
+the render-target/multi-pass plumbing separable blur/glow/shadow all need)
+is still open, same gap Phase 7 flagged in `compositor.md`.
 
 ---
 
@@ -445,21 +450,21 @@ Uses findings from **Spike B** — do not implement full TTS pipeline until Spik
 
 ## Milestones summary
 
-| Milestone | Gate condition                                                                                                                                                                                                                                  |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)                                                                                                                                                                                      |
-| **M1**    | Monorepo scaffold + shared types compiling                                                                                                                                                                                                      |
-| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                                                                                          |
-| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                                                                               |
-| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine ✅ (2026-07-06), Timeline Engine ✅ (2026-07-06), Rendering Engine ✅ (2026-07-07) prerequisites done; Export/History/Canvas UI still pending.           |
-| **M5**    | ✅ All layer types, full Timeline edit ops (2026-07-06), Animation Engine (2026-07-06) — multi-clip blending still open (ADR-005 #3)                                                                                                            |
-| **M6**    | ✅ Rendering Engine: WebGPU + WebGL2 + Canvas2D + Software backends, Scene Graph, dirty-tracking, Render Graph topology (2026-07-07) — texture cache eviction still open (needs GPU memory budget number); Effects Engine (Phase 8) not started |
-| **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                                                                              |
-| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                                                                                          |
-| **M9**    | AI Engine: TTS in timeline, export with voice                                                                                                                                                                                                   |
-| **M10**   | Plugin System live, built-in tools as plugins                                                                                                                                                                                                   |
-| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)                                                                                                                                                                            |
-| **M12**   | PWA (offline, installable), CI/CD, release pipeline                                                                                                                                                                                             |
+| Milestone | Gate condition                                                                                                                                                                                                                                                                                                                                         |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)                                                                                                                                                                                                                                                                                             |
+| **M1**    | Monorepo scaffold + shared types compiling                                                                                                                                                                                                                                                                                                             |
+| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                                                                                                                                                                                                 |
+| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                                                                                                                                                                                      |
+| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine ✅ (2026-07-06), Timeline Engine ✅ (2026-07-06), Rendering Engine ✅ (2026-07-07) prerequisites done; Export/History/Canvas UI still pending.                                                                                                                  |
+| **M5**    | ✅ All layer types, full Timeline edit ops (2026-07-06), Animation Engine (2026-07-06) — multi-clip blending still open (ADR-005 #3)                                                                                                                                                                                                                   |
+| **M6**    | ✅ Rendering Engine: WebGPU + WebGL2 + Canvas2D + Software backends, Scene Graph, dirty-tracking, Render Graph topology (2026-07-07) — texture cache eviction still open (needs GPU memory budget number); ✅ Effects Engine: Blur/Glow/Shadow/Blend/Color/Transition nodes + CSS fallback (2026-07-07) — not yet wired into any backend's `drawFrame` |
+| **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                                                                                                                                                                                     |
+| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                                                                                                                                                                                                 |
+| **M9**    | AI Engine: TTS in timeline, export with voice                                                                                                                                                                                                                                                                                                          |
+| **M10**   | Plugin System live, built-in tools as plugins                                                                                                                                                                                                                                                                                                          |
+| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)                                                                                                                                                                                                                                                                                   |
+| **M12**   | PWA (offline, installable), CI/CD, release pipeline                                                                                                                                                                                                                                                                                                    |
 
 ---
 
