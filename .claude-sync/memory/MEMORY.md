@@ -9,6 +9,7 @@
 - [Phase 7 Rendering Engine decisions](project_phase7_rendering_engine.md) — IRenderBackend x4 (WebGPU/WebGL2/Canvas2D/Software), Dag+DirtyTrackedGraph added to shared (ADR-005 #1/#3), placeholder-only content, texture cache eviction still open, fixed repo-wide tsc -b --noEmit bug
 - [Phase 8 Effects Engine decisions](project_phase8_effects_engine.md) — IEffectNode shape (structurally compatible with Rendering's IRenderGraphNode), Blur/Glow/Shadow/BlendMode/ColorAdjustment/Transition factories, params baked as shader consts, no backend wiring yet
 - [Phase 9 Audio Engine decisions](project_phase9_audio_engine.md) — IAudioContext DI pattern, Mixer/audio-graph/effects/AudioClockSync API shapes, corrected Noise Gate doc claim (not native), AudioWorklet DSP left open
+- [Phase 10 Export Engine decisions](project_phase10_export_engine.md) — Mediabunny-shaped DI (no real dep yet), codec/preset design, job state machine, GIF/Export Graph/WASM fallback left open
 - [Phase 1 scaffold decisions](project_phase1_scaffold_decisions.md) — Conventions set where docs were stubs: npm scope, minimal I*Engine interfaces, ExportPreset, import-boundary gaps
 - [Phase 0 spike findings](project_phase0_spike_findings.md) — Export pipeline passed (Mediabunny replaces mp4box.js/mp4-muxer, ADR-012); TTS pipeline confirmed but 14s generate time misses <5s target
 - [Architecture non-negotiables](project_architecture_rules.md) — UI/engine separation, Tick time, Frame State invariant, VFS-only storage access

@@ -56,9 +56,18 @@ export enum RenderBackend {
   Software = "Software",
 }
 
-/** Single MVP preset per docs/24-roadmap/mvp.md Step 1. Extend as new presets ship. */
+/**
+ * `Preset1080p30H264Opus` is the MVP preset per docs/24-roadmap/mvp.md Step
+ * 1. The rest ship in Phase 10 alongside it — see docs/13-export/export-presets.md.
+ * GIF is intentionally not a variant here: it isn't a WebCodecs/Mediabunny
+ * target format at all (no video codec, needs palette quantization), so it
+ * stays an open item rather than a fake enum value.
+ */
 export enum ExportPreset {
+  Preset720p30H264Opus = "720p30-h264-opus",
   Preset1080p30H264Opus = "1080p30-h264-opus",
+  Preset4K30H264Opus = "4k30-h264-opus",
+  Preset1080p30VP9Opus = "1080p30-vp9-opus",
 }
 
 /** See docs/13-export/overview.md job state machine */

@@ -50,4 +50,78 @@ rendered, release, move on.
 Multiple output branches (video, audio, thumbnail, watermark, subtitle
 file) can share one render pass rather than re-rendering the timeline
 once per output — see `../DECISIONS.md` ADR-005 for how this relates to
-the project's other DAG-shaped structures.
+the project's other DAG-shaped structures. **Still open** — Phase 10
+(below) implements a single video+audio output per job, not the
+multi-branch DAG; revisit if/when a second simultaneous output (e.g. a
+thumbnail alongside the video) is actually needed.
+
+## Phase 10 implementation (`packages/export`) — complete (2026-07-07)
+
+Built exactly to the "engine exists, integration is a later phase" pattern
+Phases 7/8/9 established for their own backends: real orchestration logic,
+hand-rolled DI interfaces standing in for the real browser/Mediabunny
+surface, no actual `<canvas>`/`VideoEncoder`/Mediabunny wiring yet (that
+needs a real Rendering backend and a real Timeline evaluator, neither of
+which exists yet either — see those phases' own docs for the same gap).
+
+- `codecs.ts` — `VideoCodec`/`AudioCodec`/`ContainerFormat` enums (local to
+  this package, unlike `ExportPreset` which lives in `@motion-studio/shared`
+  because the event catalog references it) plus `resolveVideoCodec`/
+  `resolveAudioCodec`, which probe capability (H.264→VP9 fallback,
+  preferred-audio-codec→Opus fallback) via an injected
+  `IEncodeCapabilityProbe` — the real implementation of this interface is a
+  thin wrapper around Mediabunny's `canEncodeVideo`/`canEncodeAudio`
+  (`muxer.md`).
+- `container.ts` — `IMuxerOutput`/`IVideoTrackSource`/`IAudioTrackSource`/
+  `IMuxerFactory`, structurally matching Mediabunny's `Output`/
+  `CanvasSource`/`AudioBufferSource` (`muxer.md`'s confirmed API shape) so a
+  real adapter is a drop-in, the same DI pattern
+  `packages/audio/src/audio-context.ts` uses for Web Audio.
+- `frame-evaluator.ts` — `computeExportFrames` resamples a Composition's own
+  tick-space/fps to a preset's target fps (nearest-source-tick per output
+  frame, clamped to the last valid tick) — a real, tested piece of
+  frame-rate-conversion logic, independent of any real Timeline/Rendering
+  wiring. `IFrameEvaluator`/`IExportFrameRenderer` are the injection points
+  a real Timeline evaluation call and a real Rendering backend will satisfy
+  later.
+- `export-job.ts` — `runExportJob` drives the state machine below,
+  emitting `ExportProgressed`/`ExportCompleted`/`ExportFailed` through an
+  injected `IExportEventSink` (any object shaped like Core's
+  `EventBus.emit` — a real `EventBus` instance satisfies it directly, no
+  adapter needed). Cancellation is checked before Preparing commits and
+  before every frame; the muxer's `cancel()` (optional in the interface,
+  since not every implementation supports aborting mid-write) is called if
+  present.
+- `export-engine.ts` — `ExportEngine implements IExportEngine`, a thin
+  facade (matching `RenderingEngine`'s split) owning one `AbortController`
+  per in-flight `jobId` so `cancel(jobId)` works from outside the run loop,
+  and rejecting a duplicate `jobId` started while one is still running.
+- `wasm-fallback.ts` — registration-only, matching
+  `packages/audio/src/effects.ts`'s `createAudioWorkletEffectNode`
+  precedent: a provider registry and a `requiresUnavailableFallback` check,
+  no actual `ffmpeg.wasm` module ships. See `ffmpeg-wasm.md`.
+
+### Job state machine, as actually implemented
+
+```
+Queued (ExportEngine.run) → Preparing (codec resolution + muxer setup)
+  → Rendering (per frame: evaluate → render → videoTrack.add — fused,
+      because Mediabunny's track add() call *is* the encode step)
+  → Encoding (bulk audio, one add() call per job — no chunking yet)
+  → Muxing (finalize())
+  → Finished
+```
+
+`Cancelled` can happen at any of the checked points instead of proceeding;
+`Failed` short-circuits from a thrown error at any stage (codec resolution
+failure is the only one currently exercised in tests).
+
+### Deviations from the original checklist
+
+- Only one `add()` call for the whole audio buffer, not chunked — fine for
+  the durations tested so far, but "never buffer every frame in memory"
+  only strictly holds for video today. Revisit for long-form exports once
+  a real `IExportAudioSource` (from a real decoded asset) exists.
+- GIF is not a preset at all (see `codecs.ts`/`export-presets.md`) — it
+  isn't a WebCodecs/Mediabunny target format, so faking an enum value for
+  it would have been worse than leaving it out.

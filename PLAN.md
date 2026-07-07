@@ -306,18 +306,26 @@ Phases 7/8 flagged for Rendering/Effects backend wiring.
 
 ---
 
-## Phase 10 — Export Engine (`packages/export`)
+## Phase 10 — Export Engine (`packages/export`) ✅ complete (2026-07-07)
 
 Uses findings from **Spike A** — do not implement until Spike A is documented.
 
-- [ ] Frame State evaluation loop (same pipeline as preview — Frame State is the contract)
-- [ ] `VideoEncoder` wrapper (H.264 primary, VP9 secondary)
-- [ ] `AudioEncoder` wrapper (Opus primary, AAC with Firefox/Linux caveat documented)
-- [ ] MP4 muxer integration (`mp4-muxer` or validated equivalent)
-- [ ] WebM muxer for VP9+Opus
-- [ ] Export presets: 1080p30 H.264+Opus (MVP), 4K, 720p, GIF (post-MVP)
-- [ ] Export progress events (Worker → Event Bus → UI progress bar)
-- [ ] WASM fallback path (`ffmpeg.wasm`) for unsupported codecs/containers
+- [x] Frame State evaluation loop (same pipeline as preview — Frame State is the contract) — `computeExportFrames` (`frame-evaluator.ts`) resamples the Composition's own tick-space/fps to the preset's target fps; `IFrameEvaluator`/`IExportFrameRenderer` are the injection points a real Timeline+Rendering wiring will satisfy later, see `docs/13-export/overview.md`
+- [x] `VideoEncoder` wrapper (H.264 primary, VP9 secondary) — no separate wrapper; Mediabunny's `IVideoTrackSource.add()` (`container.ts`) already fuses render-capture + encode, see `docs/13-export/encoder.md` "Why no wrapper"
+- [x] `AudioEncoder` wrapper (Opus primary, AAC with Firefox/Linux caveat documented) — same fusion via `IAudioTrackSource`; codec choice resolved by `resolveAudioCodec` (`codecs.ts`), AAC-on-Firefox gap documented in `docs/13-export/webcodecs.md` and enforced by real fallback logic, not just a comment
+- [x] MP4 muxer integration (`mp4-muxer` or validated equivalent) — **Mediabunny**, per ADR-012; `IMuxerOutput`/`IMuxerFactory` (`container.ts`) are hand-rolled DI interfaces structurally matching its real API, no actual `mediabunny` dependency added yet (same "engine exists, integration is later" gap as Rendering/Effects/Audio)
+- [x] WebM muxer for VP9+Opus — `ContainerFormat.WebM` + `Preset1080p30VP9Opus` (`presets.ts`); same DI interfaces, untested against a real Mediabunny `WebMOutputFormat` (open question carried from `muxer.md`)
+- [x] Export presets: 1080p30 H.264+Opus (MVP), 4K, 720p, GIF (post-MVP) — 720p/1080p/4K (H.264+Opus, MP4) plus one WebM/VP9+Opus preset shipped; **GIF intentionally not implemented** — not a WebCodecs/Mediabunny target format at all, see `docs/13-export/export-presets.md`
+- [x] Export progress events (Worker → Event Bus → UI progress bar) — `runExportJob` emits `ExportProgressed`/`ExportCompleted`/`ExportFailed` (already in `@motion-studio/shared`'s event catalog) through an injected `IExportEventSink`; no real Worker wiring yet, runs on the caller's thread
+- [x] WASM fallback path (`ffmpeg.wasm`) for unsupported codecs/containers — registration-only plumbing (`wasm-fallback.ts`), matching Phase 9's AudioWorklet precedent; no actual `ffmpeg.wasm` module ships, and `export-job.ts` doesn't call into it yet on a codec-resolution failure, see `docs/13-export/ffmpeg-wasm.md`
+
+Note: `ExportEngine` (`export-engine.ts`) is a thin `IEngine` facade around
+`runExportJob`, matching `RenderingEngine`'s split — cancellation via
+per-job `AbortController`, duplicate-`jobId` rejection, `dispose()`
+aborting every in-flight job. Export Graph (multiple output branches
+sharing one render pass, ADR-005) is **not** implemented — one video+audio
+output per job only, see `docs/13-export/overview.md`'s "Export Graph"
+section.
 
 ---
 
