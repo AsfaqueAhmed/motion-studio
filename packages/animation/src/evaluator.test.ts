@@ -7,7 +7,7 @@ import {
 } from "@motion-studio/shared";
 import { describe, expect, it } from "vitest";
 import { evaluateSegment, SegmentLocator } from "./evaluator";
-import { numberLerp } from "./interpolators";
+import { colorLerp, numberLerp, vector2Lerp, type IVector2 } from "./interpolators";
 import type { IPropertyDefinition } from "./property-definition";
 
 function numberKeyframe(
@@ -18,12 +18,38 @@ function numberKeyframe(
   return { tick: toTick(tick), value, interpolation };
 }
 
+function keyframe<TValue>(
+  tick: number,
+  value: TValue,
+  interpolation: InterpolationType,
+): IKeyframe<TValue> {
+  return { tick: toTick(tick), value, interpolation };
+}
+
 const numberDefinition: IPropertyDefinition<number> = {
   layerType: LayerType.Text,
   propertyKey: "test",
   valueType: PropertyValueType.Number,
   defaultValue: 0,
   interpolate: numberLerp,
+  validate: () => true,
+};
+
+const colorDefinition: IPropertyDefinition<string> = {
+  layerType: LayerType.Text,
+  propertyKey: "fillColor",
+  valueType: PropertyValueType.Color,
+  defaultValue: "#000000",
+  interpolate: colorLerp,
+  validate: () => true,
+};
+
+const vector2Definition: IPropertyDefinition<IVector2> = {
+  layerType: LayerType.Text,
+  propertyKey: "transform.position",
+  valueType: PropertyValueType.Vector2,
+  defaultValue: { x: 0, y: 0 },
+  interpolate: vector2Lerp,
   validate: () => true,
 };
 
@@ -123,5 +149,27 @@ describe("evaluateSegment", () => {
   it("returns the constant value when there is no right keyframe", () => {
     const left = numberKeyframe(900, 42, InterpolationType.Linear);
     expect(evaluateSegment({ left, right: null }, toTick(1200), numberDefinition)).toBe(42);
+  });
+
+  it("Bezier eases a Color property via colorLerp, not just Number", () => {
+    const left: IKeyframe<string> = {
+      tick: toTick(0),
+      value: "#000000",
+      interpolation: InterpolationType.Bezier,
+      bezierControlPoints: { x1: 0, y1: 0, x2: 1, y2: 1 },
+    };
+    const right = keyframe(100, "#ffffff", InterpolationType.Linear);
+    // Linear bezier control points reduce to a straight line, so this matches a plain colorLerp at t=0.5.
+    expect(evaluateSegment({ left, right }, toTick(50), colorDefinition)).toBe("#808080");
+  });
+
+  it("Step holds the left Vector2 value until the right keyframe's tick", () => {
+    const left = keyframe(0, { x: 0, y: 0 }, InterpolationType.Step);
+    const right = keyframe(100, { x: 10, y: 20 }, InterpolationType.Step);
+    expect(evaluateSegment({ left, right }, toTick(99), vector2Definition)).toEqual({ x: 0, y: 0 });
+    expect(evaluateSegment({ left, right }, toTick(100), vector2Definition)).toEqual({
+      x: 10,
+      y: 20,
+    });
   });
 });

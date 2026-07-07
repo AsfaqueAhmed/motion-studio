@@ -67,6 +67,30 @@ describe("SplitTrackItemCommand", () => {
     expect(restored.trimOutTick).toBe(toTick(900));
   });
 
+  it("redo re-splits the item identically to the original execute", () => {
+    const { engine, item } = setup();
+    const command = new SplitTrackItemCommand(
+      "cmd-1",
+      engine,
+      item.id,
+      toTick(300),
+      createTrackItemId("b"),
+    );
+    command.execute();
+    command.undo();
+
+    command.redo();
+
+    const first = engine.requireTrackItem(item.id);
+    const second = engine.requireTrackItem(createTrackItemId("b"));
+    expect(first.durationTicks).toBe(toTick(300));
+    expect(first.trimOutTick).toBe(toTick(300));
+    expect(second.startTick).toBe(toTick(300));
+    expect(second.durationTicks).toBe(toTick(600));
+    expect(second.trimInTick).toBe(toTick(300));
+    expect(second.trimOutTick).toBe(toTick(900));
+  });
+
   it("rejects a split tick outside the item's bounds", () => {
     const { engine, item } = setup();
     const command = new SplitTrackItemCommand(

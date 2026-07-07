@@ -65,6 +65,19 @@ describe("RippleDeleteCommand", () => {
     expect(engine.requireTrackItem(itemC.id).startTick).toBe(toTick(600));
   });
 
+  it("redo re-deletes the item and re-shifts every later item identically", () => {
+    const { engine, itemA, itemB, itemC } = setup();
+    const command = new RippleDeleteCommand("cmd-1", engine, itemA.id);
+    command.execute();
+    command.undo();
+
+    command.redo();
+
+    expect(engine.trackItems.has(itemA.id)).toBe(false);
+    expect(engine.requireTrackItem(itemB.id).startTick).toBe(toTick(0));
+    expect(engine.requireTrackItem(itemC.id).startTick).toBe(toTick(300));
+  });
+
   it("does not shift items earlier than the deleted item", () => {
     const { engine, itemB, itemC } = setup();
     const command = new RippleDeleteCommand("cmd-1", engine, itemC.id);

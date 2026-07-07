@@ -4,6 +4,12 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     passWithNoTests: true,
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**", "e2e/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "e2e/**",
+      "**/*.integration.test.ts",
+    ],
   },
 });
