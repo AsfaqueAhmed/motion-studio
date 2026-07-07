@@ -41,18 +41,38 @@ backend-agnostic; every effect's actual shader must be authored once per
 backend. Budget for this — it roughly doubles the ongoing cost of
 shipping a new visual effect. See `shader-system.md`.
 
-## Known gaps to close before implementation
+## Implementation status (Phase 7, `packages/rendering`)
 
-- **Color space handling is currently unspecified.** Video decoded via
-  WebCodecs needs explicit YUV→working-space conversion or you get
-  visibly wrong (washed-out/oversaturated) output composited against
-  correctly-colored text/shapes. This needs its own section before
-  building the compositor.
-- **GPU memory budget has no concrete number** — "never exceed budget"
-  needs an actual ceiling for the LRU eviction policy to trigger against.
-- **Frame State evaluation must be incremental**, not a full
-  re-evaluation every frame, to hit 60fps with 5,000+ visible objects —
-  not yet designed in detail.
+`IRenderBackend` (`render-backend.ts`) plus four implementations —
+`WebGPURenderBackend`, `WebGL2RenderBackend`, `Canvas2DRenderBackend`,
+`SoftwareRenderBackend` — selected via `selectBackend()`
+(`backend-detection.ts`, injectable `IBackendCapabilityProbe` for testing).
+`RenderingEngine` (`rendering-engine.ts`) is the `IEngine` facade: it owns
+Frame State → Scene Graph (`buildSceneGraph`) → dirty-tracking
+(`SceneGraphDirtyTracker`) → `backend.drawFrame`. See `scene-graph.md`,
+`frame-rendering.md`, `compositor.md`, `webgpu.md`, `webgl.md`,
+`canvas-fallback.md` for each piece's detail.
+
+Content is still a flat placeholder color per node (`placeholder-color.ts`)
+— no real decoded/rasterized pixel content exists yet; that's additive once
+Assets/Effects/text-layout land (Phases 8/9/12).
+
+## Known gaps — resolved this phase
+
+- **Color space handling** — `color-space.ts`'s `yuvToRgb(y, u, v,
+standard)` implements BT.601/BT.709 full-range YUV→RGB conversion.
+  **Not yet wired to any backend** — there's no real decoded video texture
+  to convert yet (see above), so this is verified standalone (round-tripped
+  against the BT.709 forward matrix in tests) but has no call site until
+  video content lands.
+- **GPU memory budget** — still genuinely open, see `gpu-memory.md`.
+  `TextureCache` was built deliberately _without_ eviction because no
+  budget number exists (CLAUDE.md "Known hard risks" #6) — this was a
+  documented decision, not an oversight.
+- **Incremental Frame State evaluation** — `SceneGraphDirtyTracker`
+  (`scene-graph.md`) diffs successive Scene Graphs per-node instead of
+  re-evaluating everything; see `frame-rendering.md` for what's still
+  missing (dirty _rectangles_, viewport culling, load-testing at scale).
 
 ## Performance goals
 

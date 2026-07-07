@@ -1,3 +1,4 @@
+import type { IBounds } from "./dirty-graph";
 import type { LayerType } from "./enums";
 import type { CompositionId, LayerId } from "./ids";
 import type { ITransform2D } from "./layer";
@@ -13,6 +14,8 @@ export interface IFrameStateLayer {
   readonly transform: ITransform2D;
   readonly opacity: number;
   readonly zIndex: number;
+  /** Local-space (pre-transform) bounds — the Rendering Engine's Scene Graph uses this for culling/virtualization (ADR-005 primitive #1). */
+  readonly bounds: IBounds;
   readonly properties: Readonly<Record<string, unknown>>;
 }
 

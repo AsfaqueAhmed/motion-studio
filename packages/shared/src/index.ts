@@ -5,6 +5,8 @@ export * from "./layer";
 export * from "./timeline";
 export * from "./animation";
 export * from "./hierarchy";
+export * from "./dag";
+export * from "./dirty-graph";
 export * from "./frame-state";
 export * from "./command";
 export * from "./intent";

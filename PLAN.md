@@ -223,32 +223,39 @@ be pushed onto History's undo/redo stacks once it's built.
 
 ---
 
-## Phase 7 — Rendering Engine (`packages/rendering`)
+## Phase 7 — Rendering Engine (`packages/rendering`) ✅ complete (2026-07-07)
 
 ### 7.1 Backend abstraction
 
-- [ ] `IRenderBackend` interface (`init / drawFrame / dispose`)
-- [ ] WebGPU backend (primary — `05-rendering-engine/webgpu.md`)
-- [ ] WebGL2 backend (fallback — **shaders are WGSL vs GLSL, author both**)
-- [ ] Canvas2D backend (last resort)
-- [ ] Backend detection + auto-selection at startup
+- [x] `IRenderBackend` interface (`init / drawFrame / dispose`)
+- [x] WebGPU backend (primary — `05-rendering-engine/webgpu.md`) — real WGSL vertex/fragment pipeline, hand-rolled minimal `IGPUDevice`/`IGPUCanvasContext` (no `@webgpu/types` dep), verified against a fake device (no real GPU in Node/Vitest)
+- [x] WebGL2 backend (fallback — **shaders are WGSL vs GLSL, author both**) — real GLSL `#version 300 es` pipeline mirroring the WGSL topology exactly
+- [x] Canvas2D backend (last resort) — real `save/translate/rotate/scale/fillRect` pipeline against a hand-rolled `ICanvas2DContext`
+- [x] Backend detection + auto-selection at startup — `selectBackend()`, WebGPU → WebGL2 → Canvas2D → `Software` (headless/CI, not in the original fallback chain text but already scoped in `renderer-overview.md`'s backend diagram)
+- [x] `Software` backend (pure-JS RGBA framebuffer, no DOM/GPU at all) — added beyond the original checklist so Node/CI/this package's own tests have something fully real to render against; not a mock, a genuine 4th backend
 
 ### 7.2 Frame State → Scene Graph → pixels
 
-- [ ] `buildSceneGraph(frameState) → SceneGraph` (ephemeral, destroyed after frame)
-- [ ] Scene graph node: bounds, transform, opacity, effect chain ref, dirty flag
-- [ ] Render Graph execution (effect chain per node, ADR-005 DAG primitive)
-- [ ] Dirty-tracking: only re-render nodes whose inputs changed
+- [x] `buildSceneGraph(frameState) → SceneGraph` (ephemeral, destroyed after frame)
+- [x] Scene graph node: bounds, transform, opacity, properties — flat, no parent/child (hierarchy lives in the persistent Composition Graph, one layer up) and no "effect chain ref"/"dirty flag" fields on the node itself; dirty state lives in `SceneGraphDirtyTracker` instead (diffs successive Scene Graphs), see `docs/05-rendering-engine/scene-graph.md`
+- [x] Render Graph execution (effect chain per node, ADR-005 DAG primitive) — `RenderGraph` on `Dag<TId>` (ADR-005 #3, added to `@motion-studio/shared` this phase); today every layer gets the identity chain since Effects Engine (Phase 8) doesn't exist yet — **not wired into any backend's `drawFrame` yet**, see `compositor.md` open questions
+- [x] Dirty-tracking: only re-render nodes whose inputs changed — `SceneGraphDirtyTracker` on the new `DirtyTrackedGraph<TId>` (ADR-005 #1, added to `@motion-studio/shared` this phase); dirty _rectangles_ (partial repaint) still not implemented, see `frame-rendering.md`
 
 ### 7.3 GPU memory management
 
-- [ ] Texture cache with LRU eviction (**add concrete memory budget number before implementing**)
-- [ ] `OffscreenCanvas` for worker-based rendering
+- [ ] Texture cache with LRU eviction (**add concrete memory budget number before implementing**) — `TextureCache` built deliberately _without_ eviction; the budget number is still genuinely open (CLAUDE.md "Known hard risks" #6), see `docs/05-rendering-engine/gpu-memory.md`
+- [ ] `OffscreenCanvas` for worker-based rendering — not implemented; no worker-based render path exists yet (Core's `WorkerManager` has a `rendering` slot reserved since Phase 2, unused so far)
 
 ### 7.4 Frame cache
 
-- [ ] Decoded frame cache for video (LRU)
-- [ ] Pre-decode lookahead (N frames ahead of playhead)
+- [x] Decoded frame cache for video (LRU) — `DecodedFrameCache<TFrame>`, count-based eviction (not GPU-memory-bounded, so no budget number needed); not yet wired to a real `VideoDecoder` pipeline (Assets/Export own that, Phases 10/12)
+- [x] Pre-decode lookahead (N frames ahead of playhead) — `computeLookaheadTicks(currentTick, ticksPerFrame, lookaheadFrames)`
+
+### Also landed this phase (not in the original checklist)
+
+- [x] Color space conversion (`color-space.ts`, `yuvToRgb` BT.601/BT.709) — closes the "color space handling is currently unspecified" gap from `renderer-overview.md`; not yet wired to any backend since no real decoded video texture exists yet
+- [x] `RenderingEngine implements IEngine` facade (`rendering-engine.ts`) tying Frame State → Scene Graph → dirty-tracking → backend together, matching every other engine's `initialize/ready/dispose` lifecycle
+- [x] Fixed a pre-existing, repo-wide `tsc -b --noEmit` bug (TS6310 — build-mode `--noEmit` is fundamentally incompatible with TypeScript project references whenever an upstream referenced project needs a real rebuild). Every package's `"typecheck"` script changed from `tsc -b --noEmit` to `tsc -b`. This wasn't a Phase 7 regression — it silently affected every prior phase too, just never surfaced because turbo's cache hid it.
 
 ---
 
@@ -438,21 +445,21 @@ Uses findings from **Spike B** — do not implement full TTS pipeline until Spik
 
 ## Milestones summary
 
-| Milestone | Gate condition                                                                                                                                                                                                   |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)                                                                                                                                                       |
-| **M1**    | Monorepo scaffold + shared types compiling                                                                                                                                                                       |
-| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                                                           |
-| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                                                |
-| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine ✅ (2026-07-06) and Timeline Engine ✅ (2026-07-06) prerequisites done; Rendering/Export/History/Canvas UI still pending. |
-| **M5**    | ✅ All layer types, full Timeline edit ops (2026-07-06), Animation Engine (2026-07-06) — multi-clip blending still open (ADR-005 #3)                                                                             |
-| **M6**    | Rendering: WebGPU + WebGL2 fallback, Effects Engine                                                                                                                                                              |
-| **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                                               |
-| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                                                           |
-| **M9**    | AI Engine: TTS in timeline, export with voice                                                                                                                                                                    |
-| **M10**   | Plugin System live, built-in tools as plugins                                                                                                                                                                    |
-| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)                                                                                                                                             |
-| **M12**   | PWA (offline, installable), CI/CD, release pipeline                                                                                                                                                              |
+| Milestone | Gate condition                                                                                                                                                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0**    | ✅ Both spikes complete with written findings (2026-07-06)                                                                                                                                                                                      |
+| **M1**    | Monorepo scaffold + shared types compiling                                                                                                                                                                                                      |
+| **M2**    | ✅ Core Engine: DI, event bus, scheduler, workers running (2026-07-06)                                                                                                                                                                          |
+| **M3**    | ✅ Storage: VFS, project save/load, asset OPFS store (2026-07-06)                                                                                                                                                                               |
+| **M4**    | Vertical slice: import → trim → move → undo → export (preview == export). Layer Engine ✅ (2026-07-06), Timeline Engine ✅ (2026-07-06), Rendering Engine ✅ (2026-07-07) prerequisites done; Export/History/Canvas UI still pending.           |
+| **M5**    | ✅ All layer types, full Timeline edit ops (2026-07-06), Animation Engine (2026-07-06) — multi-clip blending still open (ADR-005 #3)                                                                                                            |
+| **M6**    | ✅ Rendering Engine: WebGPU + WebGL2 + Canvas2D + Software backends, Scene Graph, dirty-tracking, Render Graph topology (2026-07-07) — texture cache eviction still open (needs GPU memory budget number); Effects Engine (Phase 8) not started |
+| **M7**    | Audio Engine preview + export, full Export presets                                                                                                                                                                                              |
+| **M8**    | Asset Manager complete (dedup, dependency graph, thumbnails/waveforms)                                                                                                                                                                          |
+| **M9**    | AI Engine: TTS in timeline, export with voice                                                                                                                                                                                                   |
+| **M10**   | Plugin System live, built-in tools as plugins                                                                                                                                                                                                   |
+| **M11**   | Full Editor UI (Canvas, Timeline, Inspector, Asset Browser, Toolbar)                                                                                                                                                                            |
+| **M12**   | PWA (offline, installable), CI/CD, release pipeline                                                                                                                                                                                             |
 
 ---
 
