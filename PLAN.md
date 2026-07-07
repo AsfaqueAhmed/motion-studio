@@ -277,19 +277,32 @@ is still open, same gap Phase 7 flagged in `compositor.md`.
 
 ---
 
-## Phase 9 — Audio Engine (`packages/audio`)
+## Phase 9 — Audio Engine (`packages/audio`) ✅ complete (2026-07-07)
 
 ### 9.1 Realtime preview
 
-- [ ] `AudioContext`-based graph for live preview
-- [ ] Per-track volume/mute/pan nodes
-- [ ] Mixer: master + per-track faders
-- [ ] Sync to Timeline tick (explicit resync strategy for long projects — open risk)
+- [x] `AudioContext`-based graph for live preview — `buildClipChain` (`Clip -> Gain -> Pan`, `audio-graph.ts`) against the shared `IAudioContext` interface, see `docs/10-audio-engine/audio-graph.md`
+- [x] Per-track volume/mute/pan nodes — `Mixer.addTrack`/`setTrackVolume`/`setTrackMuted`/`setTrackPan` (`mixer.ts`); mute layers on top of volume rather than overwriting it
+- [x] Mixer: master + per-track faders — `masterGain -> limiter -> destination` plus one bus per `TrackId`, see `docs/10-audio-engine/mixer.md`
+- [x] Sync to Timeline tick (explicit resync strategy for long projects — open risk) — `AudioClockSync` (`synchronization.ts`): anchor `(tick, currentTime)` at play/seek, re-anchor once drift exceeds a threshold; wired to Core's `Scheduler.onAudioSync(tick)` via `AudioTransport` (`playback.ts`), closes the open risk in CLAUDE.md/DECISIONS.md — see `docs/10-audio-engine/synchronization.md`
 
 ### 9.2 Export render
 
-- [ ] `OfflineAudioContext` for offline render (different timing model — note in code)
-- [ ] `AudioWorklet` nodes must work correctly under both `AudioContext` and `OfflineAudioContext`
+- [x] `OfflineAudioContext` for offline render (different timing model — note in code) — `IOfflineAudioContext` (`audio-context.ts`), `AudioEngine.buildOfflineMixer` builds an independent `Mixer` against it; same graph-construction code as realtime, per `docs/10-audio-engine/overview.md` "Preview vs. export"
+- [x] `AudioWorklet` nodes must work correctly under both `AudioContext` and `OfflineAudioContext` — `IAudioWorkletContext`/`createAudioWorkletEffectNode` (`effects.ts`) registration plumbing is real and context-agnostic; no actual worklet DSP (Noise Gate/Pitch Shift/Speed) ships yet, see `docs/10-audio-engine/effects.md`
+
+### Also landed this phase (not in the original checklist)
+
+- [x] Native effect nodes beyond the checklist's scope: EQ (`createEqChain`), Compressor, Limiter, Delay, Reverb (`createReverbChain`, convolution) — all real, native Web Audio graphs, see `docs/10-audio-engine/effects.md`
+- [x] Ducking (`Mixer.duckTrack`) — carried-forward design-review recommendation from `overview.md`, a scheduled gain ramp on the existing per-track bus
+- [x] Waveform consumer-side types (`IWaveformData`, `peaksInRange`) — Audio Engine's read-only half of `docs/10-audio-engine/waveform.md`; generation stays Assets/Media's job
+- [x] Corrected `overview.md`'s original claim that Noise Gate is a native `DynamicsCompressorNode` composition — it isn't (no native node expresses a per-sample gate), reclassified alongside Pitch Shift/Speed as AudioWorklet-only, see `docs/10-audio-engine/effects.md`
+
+Note: no wiring yet to a real Timeline (`ITrackItem`) or decoded media
+(`AudioBuffer` from a real asset) — this phase implements the graph,
+mixer, and clock-sync mechanics against the shared `IAudioContext`
+interface, the same "engine exists, integration is a later phase" gap
+Phases 7/8 flagged for Rendering/Effects backend wiring.
 
 ---
 
