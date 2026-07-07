@@ -1,7 +1,12 @@
-export default function HomePage() {
+"use client";
+
+import { EditorKernelProvider } from "../components/editor-kernel-provider";
+import { EditorShell } from "../components/editor-shell";
+
+export default function HomePage(): JSX.Element {
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <h1 className="text-2xl font-semibold">Motion Studio</h1>
-    </main>
+    <EditorKernelProvider>
+      <EditorShell />
+    </EditorKernelProvider>
   );
 }

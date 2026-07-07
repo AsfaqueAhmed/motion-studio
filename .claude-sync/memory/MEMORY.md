@@ -14,8 +14,10 @@
 - [Phase 12 Asset Manager decisions](project_phase12_asset_manager.md) — AssetId = content hash (exact catalog dedup), AssetDependencyGraph reuses shared Hierarchy primitive, no engine-to-engine imports, all storage/decoder deps are DI-only, proxy/LOD/worker/tags out of scope
 - [Phase 13 AI Engine decisions](project_phase13_ai_engine.md) — CapabilityRegistry/ModelManager/Kokoro+Piper providers, tensor shapes confirmed by decompiling vendored kokoro-js from Spike B (not guessed), background removal/task queue out of scope
 - [Phase 14 Plugin System decisions](project_phase14_plugin_system.md) — PluginRegistry/PluginEngine lifecycle, PluginLifecycleState extended (Suspended/Deactivated), permission-scoped IPluginAPI sandbox, 5 DI sub-APIs mirror other engines w/o importing them, no integration layer wired yet
+- [Phase 15 Editor UI decisions](project_phase15_editor_ui.md) — EditorKernel integration layer (8 engines wired, Audio/Export/AI/Effects deferred), CommandBus/Editor Services/ToolRegistry/PropertySchemaRegistry all new, fixed-grid layout not docking tree, real dnd-kit click-vs-drag bug found via manual browser testing
 - [Phase 1 scaffold decisions](project_phase1_scaffold_decisions.md) — Conventions set where docs were stubs: npm scope, minimal I*Engine interfaces, ExportPreset, import-boundary gaps
 - [Phase 0 spike findings](project_phase0_spike_findings.md) — Export pipeline passed (Mediabunny replaces mp4box.js/mp4-muxer, ADR-012); TTS pipeline confirmed but 14s generate time misses <5s target
 - [Architecture non-negotiables](project_architecture_rules.md) — UI/engine separation, Tick time, Frame State invariant, VFS-only storage access
 - [Docs update workflow](feedback_docs_workflow.md) — Fill stub docs as each engine is built; spikes update docs/13-export/ and docs/11-ai/ first
 - [Phase branching](feedback_phase_branching.md) — Create a new git branch named after the phase when starting each PLAN.md phase
+- [Manual verification](feedback_manual_verification.md) — Always drive real UI flows in a browser (Playwright/chromium-cli) before declaring a UI phase done; typecheck/lint/unit tests miss interaction-layer bugs

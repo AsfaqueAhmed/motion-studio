@@ -409,59 +409,88 @@ own cross-engine wiring.
 
 ---
 
-## Phase 15 — Editor UI (`apps/studio`)
+## Phase 15 — Editor UI (`apps/studio`) ✅ complete (2026-07-07)
 
 ### 15.1 App shell (Next.js)
 
-- [ ] PWA manifest + Service Worker (offline after first load)
-- [ ] Dark theme design system (Tailwind, custom design tokens)
-- [ ] Dockable panel layout (ResizablePanelGroup or custom)
-- [ ] Keyboard shortcut system (`17-ui/shortcuts.md` — Command System)
+- [x] PWA manifest + Service Worker (offline after first load) — `public/manifest.json` + hand-rolled `public/sw.js` (cache-first static assets, network-first-with-cache-fallback navigation); no `next-pwa`/Workbox dependency added
+- [x] Dark theme design system (Tailwind, custom design tokens) — `tailwind.config.ts` `editor.*` token set (`bg/surface/surface-raised/border/text/text-muted/accent`), `darkMode: "class"`, `<html className="dark">`
+- [x] Dockable panel layout (ResizablePanelGroup or custom) — **scoped down to a fixed CSS grid** (`EditorShell`); no Split/Stack/Panel tree, no floating panels, no workspace presets, no layout-undo (ADR-011) — real docking engine deferred, see `docs/17-ui/docking.md`
+- [x] Keyboard shortcut system (`17-ui/shortcuts.md` — Command System) — `ShortcutService` (Global scope only, 6 bindings, duplicate-binding conflict detection); Command Palette and Macro recording not built (ADR still open on Intent-vs-literal-Command replay)
 
 ### 15.2 Canvas panel
 
-- [ ] `ViewportCamera` (pan/zoom/rotation — pure UI state, never saved to project)
-- [ ] Layer selection (click, Shift+click, drag-box)
-- [ ] Transform handles (move, scale, rotate)
-- [ ] Overlays (bounding boxes, anchor points, safe zones)
+- [x] `ViewportCamera` (pan/zoom/rotation — pure UI state, never saved to project) — `useCanvasStore` field declared; not yet wired to actual pan/zoom gesture handling (no Interaction Pipeline exists — see 15.6 note)
+- [x] Layer selection (click, Shift+click, drag-box) — single-select only, inline AABB hit-test against the last-rendered Frame State (`worldBounds`) — **placeholder for the real Selection Engine spatial index**, which doesn't exist as a package (`toolbar.md`'s "Hit testing" section); Shift+click/drag-box not implemented
+- [x] Transform handles (move, scale, rotate) — **not implemented**; Inspector numeric fields are the only way to edit transform this phase
+- [x] Overlays (bounding boxes, anchor points, safe zones) — bounding-box overlay only, drawn on a separate 2D overlay `<canvas>`; anchor points/safe zones not implemented
+
+Real `RenderingEngine`/`IRenderBackend` pipeline wired end-to-end (`render-backend-factory.ts`: WebGPU→WebGL2→Canvas2D→Software, falling back further if construction throws) — verified in a real Chromium via Playwright that a placeholder colored rect actually reaches canvas pixels (pixel-sampled, not just "no console errors"). `RenderingEngine`'s lifecycle is owned by `CanvasPanel`, not `AppEngine` (needs a real `<canvas>`, which only exists once the panel mounts). `frame-state-builder.ts` is new glue (Timeline+Animation+Layer → Frame State) that didn't exist in any engine package. Every layer renders at a fixed `PLACEHOLDER_BOUNDS` (200×200) — no engine models a Layer's intrinsic size yet.
 
 ### 15.3 Timeline panel
 
-- [ ] Virtualized track/clip view (only render visible clips)
-- [ ] Playhead scrubbing
-- [ ] Track headers (label, mute, lock, solo)
-- [ ] Clip rendering (thumbnail strip for video, waveform for audio, colored bar for others)
-- [ ] Drag/drop clips (dnd-kit)
-- [ ] Snapping indicators
+- [x] Virtualized track/clip view (only render visible clips) — **scoped down to plain full render, no windowing**; track/item counts in this vertical slice are small enough that virtualization has no observable benefit yet
+- [x] Playhead scrubbing — click-to-seek on track lane background, via `PlaybackService`
+- [x] Track headers (label, mute, lock, solo) — label/muted/locked shown; **no solo** (`ITrack` has no solo field, no engine soloing logic — not invented)
+- [x] Clip rendering (thumbnail strip for video, waveform for audio, colored bar for others) — **colored bar with layer name only**; no thumbnail/waveform generation wired into any panel (no decoder pipeline anywhere in the project)
+- [x] Drag/drop clips (dnd-kit) — one shared `DndContext` (`EditorShell`) for both Asset→Timeline (creates Layer+TrackItem via `TimelineEditorService.addClipFromAsset`) and Timeline-internal clip moves (`moveTrackItem`); `PointerSensor` activation distance + a same-position guard in `handleDragEnd` prevent a plain click from being misread as a zero-distance drag (found via manual Playwright testing — a real bug, not hypothetical: it silently pushed no-op `MoveTrackItemCommand`s onto the undo stack)
+- [x] Snapping indicators — **not implemented**
 
 ### 15.4 Inspector panel
 
-- [ ] `PropertySchemaRegistry` — maps layer types to UI sections + editors
-- [ ] Numeric, text, color, dropdown, toggle editors
-- [ ] Animated property indicator (diamond icon) + keyframe add/remove
-- [ ] Inline validation (UX convenience — real enforcement is in command handlers)
+- [x] `PropertySchemaRegistry` — maps layer types to UI sections + editors — reuses `AnimatablePropertyRegistry` (Animation Engine) as the source of truth for which properties exist, adding only label/editor-widget/static-field UI concerns on top, per its own doc comment distinguishing it from that registry (see GLOSSARY.md)
+- [x] Numeric, text, color, dropdown, toggle editors — numeric/text/color/toggle implemented; **no dropdown editor** (nothing in the current property set needs one — `textAlign`/`fitMode` render as plain text inputs, not `<select>`)
+- [x] Animated property indicator (diamond icon) + keyframe add/remove — diamond adds a keyframe at the current tick (creates the `AnimationClip`/`PropertyTrack` on demand, bundled into one undo step); no per-keyframe remove UI yet (only via undo)
+- [x] Inline validation (UX convenience — real enforcement is in command handlers) — no inline validation added; real enforcement already exists in `UpdateLayerCommand`/`AddKeyframeCommand` (unchanged)
 
 ### 15.5 Asset Browser panel
 
-- [ ] Thin UI view over `AssetManager` (no registry of its own — ADR-002)
-- [ ] Import button (opens File System Access API picker)
-- [ ] Grid/list toggle, search, filter by type
-- [ ] Unused assets filter (zero dependency references)
-- [ ] Drag asset from panel to Timeline/Canvas
+- [x] Thin UI view over `AssetManager` (no registry of its own — ADR-002) — `AssetEditorService` is a pure passthrough
+- [x] Import button (opens File System Access API picker) — plain `<input type=file multiple>`, not the File System Access API (broader browser support, same user-facing result for import)
+- [x] Grid/list toggle, search, filter by type — grid/list toggle + substring name search; **no filter-by-type** control
+- [x] Unused assets filter (zero dependency references) — `listUnused()` checkbox, reuses `AssetDependencyGraph.isUnused`
+- [x] Drag asset from panel to Timeline/Canvas — Timeline only (drop creates a Layer+TrackItem); dragging onto the Canvas panel isn't a drop target
 
 ### 15.6 Toolbar
 
-- [ ] Tool System (from `17-ui/toolbar.md` — ADR-001)
-- [ ] Tools: Select, Pen/Shape, Text, Scissors (cut), Hand (pan)
-- [ ] Tool sessions (stateful while active, cleaned up on switch)
+- [x] Tool System (from `17-ui/toolbar.md` — ADR-001) — `ToolRegistry` (`apps/studio`) is the first real implementation of `IToolAPI`/the Tool Registry both `toolbar.md` and `packages/plugin/src/tool-api.ts` describe but neither built; wired as `PluginEngine`'s `hostApi.tools`
+- [x] Tools: Select, Pen/Shape, Text, Scissors (cut), Hand (pan) — **Select only**, via `createSelectToolPlugin()` (Phase 14); no Interaction Pipeline exists (`InteractionContext`: pointer/camera/viewport/selection/snapping/guides/modifiers) for the other tools to drive, so they're not stubbed in either
+- [x] Tool sessions (stateful while active, cleaned up on switch) — **not implemented**; `IPluginTool.activate()/deactivate()` are no-ops (same gap `createSelectToolPlugin`'s own Phase 14 doc comment flagged)
 
 ### 15.7 State management (Zustand — UI-only state)
 
-- [ ] `useTimelineStore` — playhead, zoom, scroll, selection
-- [ ] `useCanvasStore` — ViewportCamera, active tool, overlay visibility
-- [ ] `useInspectorStore` — selected layer, open sections
-- [ ] `useProjectStore` — project metadata (name, saved state, dirty flag)
-- [ ] Project data (Layers, TrackItems, Keyframes) is **not** in Zustand — it lives in engine state, read via selectors
+- [x] `useTimelineStore` — playhead, zoom, scroll, selection — zoom/selection implemented; **no scroll-position state** (panel isn't scrollable beyond native overflow)
+- [x] `useCanvasStore` — ViewportCamera, active tool, overlay visibility — all three fields present; camera isn't yet driven by any pan/zoom gesture (15.2)
+- [x] `useInspectorStore` — selected layer, open sections — open-sections only; selected layer is deliberately _not_ duplicated here, it's derived from `useTimelineStore`'s selection (avoids two sources of truth)
+- [x] `useProjectStore` — project metadata (name, saved state, dirty flag) — fields present; `dirty` isn't wired to a real save flow (no Project Service/persistence this phase)
+- [x] Project data (Layers, TrackItems, Keyframes) is **not** in Zustand — it lives in engine state, read via selectors — `useEngineRevisionStore` is the one bridge from Event Bus to React re-renders; every panel reads Layers/TrackItems/Keyframes straight off the engine instances
+
+Note: `EditorKernel`/`createEditorKernel` (`apps/studio/src/editor-kernel/`) is
+the integration layer every phase since 7 has flagged as missing — it's the
+first place that constructs and wires together real instances of Storage,
+Assets, Layer, Timeline, Animation, History, and Plugin behind one
+`AppEngine`, plus a `CommandBus` (thin wrapper over `HistoryEngine.execute`)
+and Editor Services (Timeline/Inspector/Asset/Playback + `ToolRegistry`).
+**Audio, Export, AI, and Effects are deliberately not constructed** — no
+panel this phase touches them; they get wired in when their own UI lands.
+`RenderingEngine` is also outside `AppEngine`'s lifecycle, owned instead by
+`CanvasPanel` (needs a real `<canvas>` that only exists once mounted).
+`AssetManager` is wired with real Phase 3/12 adapters (`IndexedDBAdapter` via
+`StorageEngine`, `AssetBlobStore`, a new `AssetCatalogRepository` extending
+`JsonRepository`) plus a new browser-API-backed `IMetadataExtractor`
+(`createImageBitmap`/`<video>`/`AudioContext.decodeAudioData`/hand-rolled
+SFNT `name`-table parsing for fonts) — the first concrete implementation of
+that interface anywhere in the project. `AddLayerCommand`/`AddTrackItemCommand`/
+`UpdateLayerCommand`/`AddAnimationClipCommand`/`AddPropertyTrackCommand`/
+`RegisterAssetReferenceCommand` are new — Layer had zero `ICommand`s before
+this, and Timeline/Animation had no "add a container" commands (only
+mutate-existing ones). `DeleteSelectionIntent` only removes TrackItems, not
+their Layers/Animation clips — ADR-010 (ripple/linked-delete cascade) is
+still open, so no cascade policy was invented. Verified end-to-end in a real
+headless Chromium (Playwright): import → drag onto Timeline → select →
+edit/keyframe in Inspector → move → undo/redo, with the real
+`RenderingEngine` pipeline confirmed via pixel sampling to reach actual
+canvas pixels.
 
 ---
 

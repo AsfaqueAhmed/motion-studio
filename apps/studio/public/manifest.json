@@ -1,0 +1,10 @@
+{
+  "name": "Motion Studio",
+  "short_name": "Motion Studio",
+  "description": "Browser-based, offline-capable motion graphics engine.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#151517",
+  "theme_color": "#151517",
+  "icons": []
+}

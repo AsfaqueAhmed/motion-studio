@@ -47,9 +47,36 @@ importers:
       '@dnd-kit/core':
         specifier: ^6.1.0
         version: 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@motion-studio/animation':
+        specifier: workspace:*
+        version: link:../../packages/animation
+      '@motion-studio/assets':
+        specifier: workspace:*
+        version: link:../../packages/assets
+      '@motion-studio/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@motion-studio/history':
+        specifier: workspace:*
+        version: link:../../packages/history
+      '@motion-studio/layer':
+        specifier: workspace:*
+        version: link:../../packages/layer
+      '@motion-studio/plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugin
+      '@motion-studio/rendering':
+        specifier: workspace:*
+        version: link:../../packages/rendering
       '@motion-studio/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@motion-studio/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      '@motion-studio/timeline':
+        specifier: workspace:*
+        version: link:../../packages/timeline
       next:
         specifier: ^14.2.15
         version: 14.2.35(@playwright/test@1.61.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
