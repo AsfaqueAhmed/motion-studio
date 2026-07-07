@@ -1,1 +1,12 @@
-export {};
+export * from "./effects-api";
+export * from "./export-api";
+export * from "./ai-capability-api";
+export * from "./tool-api";
+export * from "./panel-api";
+export * from "./plugin-api";
+export * from "./plugin";
+export * from "./permissions";
+export * from "./plugin-registry";
+export * from "./plugin-engine";
+export * from "./built-ins/select-tool-plugin";
+export * from "./built-ins/default-export-preset-plugin";

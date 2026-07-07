@@ -41,6 +41,11 @@ export interface AppEventMap {
   ModelLoadFailed: { modelId: string; reason: string };
   InferenceCompleted: { taskId: string; capability: AICapability };
   InferenceFailed: { taskId: string; capability: AICapability; reason: string };
+  PluginRegistered: { pluginId: string };
+  PluginActivated: { pluginId: string };
+  PluginActivationFailed: { pluginId: string; reason: string };
+  PluginSuspended: { pluginId: string };
+  PluginDeactivated: { pluginId: string };
 }
 
 export type AppEventType = keyof AppEventMap;

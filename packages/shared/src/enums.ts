@@ -92,13 +92,22 @@ export enum AICapability {
   EnhanceVoice = "EnhanceVoice",
 }
 
-/** See docs/16-plugin-system/overview.md lifecycle */
+/**
+ * See docs/16-plugin-system/lifecycle.md. `Validating` -> `RequestingPermissions`
+ * -> `Registered` is `PluginRegistry.register()`; `Initializing` -> `Ready` is
+ * `activate()`. `Suspended`/`Deactivated` were added in Phase 14 to cover
+ * PLAN.md's "register -> activate -> suspend -> deactivate" — this enum
+ * predates that phase (scaffolded in Phase 1) and only modeled the
+ * register/activate half, so it's extended rather than replaced.
+ */
 export enum PluginLifecycleState {
   Validating = "Validating",
   RequestingPermissions = "RequestingPermissions",
   Registered = "Registered",
   Initializing = "Initializing",
   Ready = "Ready",
+  Suspended = "Suspended",
+  Deactivated = "Deactivated",
 }
 
 /** See docs/09-effects-engine/overview.md */
