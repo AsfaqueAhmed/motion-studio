@@ -346,15 +346,22 @@ direct `EventBus` dependency.
 
 ---
 
-## Phase 12 — Asset Manager (`packages/assets`)
+## Phase 12 — Asset Manager (`packages/assets`) ✅ complete (2026-07-07)
 
-- [ ] `AssetManager` — single source of truth for all assets
-- [ ] Import pipeline (worker-based: decode, generate thumbnail + waveform, extract metadata, store in OPFS)
-- [ ] Asset catalog (IndexedDB: id, name, type, size, duration, contentHash, tags, createdAt)
-- [ ] Dedup by content hash (same file imported twice = one asset)
-- [ ] Asset Dependency Graph (which TrackItems reference each asset — used for safe-delete warnings)
-- [ ] "Unused assets" view = assets with zero incoming dependency references
-- [ ] Supported types: MP4, MOV, WebM, MP3, WAV, OGG, PNG, JPEG, WebP, SVG, GIF, fonts, LUTs
+- [x] `AssetManager` — single source of truth for all assets — `AssetManager implements IAssetsEngine` (`asset-manager.ts`), thin facade over `AssetCatalog` + `AssetDependencyGraph` + the import pipeline, matching `ExportEngine`/`HistoryEngine`'s split, see `docs/14-assets/asset-manager.md`
+- [x] Import pipeline (worker-based: decode, generate thumbnail + waveform, extract metadata, store in OPFS) — `importAsset` (`import-pipeline.ts`) runs the full validate→hash→store→metadata→thumbnail→waveform→catalog sequence; **not worker-based** — runs on the caller's thread, same unwired gap as Export's job runner (Phase 10), see `docs/14-assets/importer.md`
+- [x] Asset catalog (IndexedDB: id, name, type, size, duration, contentHash, tags, createdAt) — `IAssetCatalogEntry`/`AssetCatalog` (`asset-catalog.ts`); `IAssetCatalogStore` is a DI interface matching storage's `IRepository<T>` shape, no real IndexedDB-backed store wired in yet (same "engine exists, integration is later" gap as every DI boundary since Phase 7)
+- [x] Dedup by content hash (same file imported twice = one asset) — the `AssetId` **is** `createAssetId(contentHash)`, so re-import resolves to the same catalog row and skips re-running metadata/thumbnail/waveform extraction entirely, see `docs/14-assets/importer.md` "Dedup"
+- [x] Asset Dependency Graph (which TrackItems reference each asset — used for safe-delete warnings) — `AssetDependencyGraph` (`dependency-graph.ts`) built on the generic `Hierarchy<TId>` primitive (ADR-005 #2) rather than a bespoke structure, per `Hierarchy`'s own Phase-4 doc comment anticipating this exact reuse; never imports Layer/Timeline (CLAUDE.md "the one rule") — callers register/unregister references explicitly
+- [x] "Unused assets" view = assets with zero incoming dependency references — `AssetManager.listUnused()`
+- [x] Supported types: MP4, MOV, WebM, MP3, WAV, OGG, PNG, JPEG, WebP, SVG, GIF, fonts, LUTs — `detectAssetType` (`supported-types.ts`), extension-first (MIME is unreliable/empty for fonts and `.cube` LUTs in practice) with MIME fallback; `AssetType` enum added to `@motion-studio/shared`
+
+Note: Proxy generation (mentioned in `docs/14-assets/overview.md`'s
+original stub as "the single most important thing" for 4K+ footage) and
+thumbnail LOD-by-zoom-level are **not implemented** — neither was in this
+checklist. `AssetDeleted` was added to `@motion-studio/shared`'s event
+catalog alongside the already-speculative `AssetImported`/
+`AssetImportFailed`.
 
 ---
 

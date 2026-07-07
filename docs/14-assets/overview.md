@@ -1,5 +1,7 @@
 # Assets Engine — Overview
 
+> Status: Implemented (Phase 12, 2026-07-07). See `packages/assets/src`.
+
 **The single canonical asset management engine.** Earlier design drafts
 independently specified this twice — once as a "Media Engine," once
 again as an "Assets Panel" with a near-identical registry, database,
@@ -9,47 +11,68 @@ truth; the UI-facing browser is a thin view over it. See
 
 ## Owns
 
-Import, validation, hashing/dedup, metadata extraction, thumbnail/
-waveform/proxy generation, tagging, favorites, collections, search, and
-the Asset Dependency Graph (which compositions/clips/templates reference
-a given asset — enables safe-delete warnings and "unused assets"
-cleanup as one mechanism, not two).
+Import, validation, hashing/dedup (delegated to `IAssetBlobStore`, see
+below), metadata extraction, thumbnail/waveform generation, and the Asset
+Dependency Graph (which references — today: TrackItem ids, passed in as
+opaque strings — point at a given asset; enables safe-delete and "unused
+assets"). Tagging is a data field on the catalog entry only — no
+dedicated tag-editing API this phase, since PLAN.md Phase 12 doesn't
+require one; favorites/collections/search were never in the Phase 12
+checklist either and are not implemented.
 
 ## Never does
 
-Decode media itself (delegates to worker pipelines / the Layer Engine's
-media handling), render, play audio, store project structure (Storage
-Engine's job for the underlying bytes; this engine owns the catalog on
-top).
+Decode media itself (delegates to `IMetadataExtractor` /
+`IThumbnailGenerator` / `IWaveformGenerator` — all DI interfaces, no real
+decoder wired up yet), render, play audio, or touch IndexedDB/OPFS
+directly. `IAssetBlobStore` / `IAssetCatalogStore` / `IThumbnailStore` /
+`IWaveformStore` are DI interfaces structurally matching
+`@motion-studio/storage`'s real `AssetBlobStore` / a `JsonRepository` /
+`ThumbnailCache` / `WaveformRepository` — same convention as every phase
+since Rendering (Export's `IMuxerFactory`, Audio's `IAudioContext`):
+`@motion-studio/assets`'s `package.json` depends only on
+`@motion-studio/shared`, no cross-engine import.
 
-## Import pipeline
+## Import pipeline (`import-pipeline.ts`)
 
 ```
-Select/drop file → Validate → Hash → Detect type → Store (via VFS, OPFS)
-→ Extract metadata → Thumbnail → Waveform (if audio) → Proxy (if large video)
-→ Register in catalog → Ready
+validate (non-empty, supported type) → hash + store (IAssetBlobStore, dedup for free)
+→ detect type (extension first, MIME fallback — supported-types.ts)
+→ extract metadata → thumbnail (Image/Video) → waveform (Audio, or Video with an audio track)
+→ register in catalog → AssetImported
 ```
 
-Everything after validation runs in workers.
+Runs on the caller's thread today — no worker wired up yet, the same gap
+as Export's job runner (Phase 10). Failure at any step emits
+`AssetImportFailed` with a reason and rethrows, matching
+`runExportJob`'s catch/emit/rethrow shape.
 
-## Proxy system
+**The asset's id is derived from its content hash.** This makes "dedup by
+content hash" (PLAN.md) exact, not approximate: re-importing identical
+bytes resolves to the same `AssetId`, so `importAsset` short-circuits on
+an existing catalog entry before re-running metadata/thumbnail/waveform
+extraction — "same file imported twice = one asset" at the catalog level,
+not just "one blob on disk."
 
-For large video: generate a lower-resolution proxy for editing, export
-from the original full-resolution source. This is the single most
-important thing for making the editor usable on real hardware with 4K+
-footage.
+## Proxy system — not built this phase
+
+The original spec calls this "the single most important thing for making
+the editor usable on real hardware with 4K+ footage," but it is not in
+PLAN.md Phase 12's checklist and was not implemented. Needs
+`VideoEncoder` (not just decode) for the downscale re-encode — see the
+open risk below, unconfirmed either way.
 
 ## Confirmed technical gaps to verify during implementation
 
 - **Container demuxing** (MP4/MOV/WEBM/AVI/MKV) isn't just "WebCodecs
-  decode" — needs format-specific demuxer libraries, and some formats
-  may have no clean native browser path at all (see `../TECH_STACK.md`).
-- **Proxy generation needs `VideoEncoder`** (not just decode) — encoder
-  codec/hardware support is generally narrower and less consistent than
-  decode support across browsers. Validate during implementation, don't
-  assume it "just works."
+  decode" — needs format-specific demuxer libraries. `IMetadataExtractor`
+  is a DI interface for exactly this reason; no real demuxer is wired in
+  yet.
+- **Proxy generation needs `VideoEncoder`** — still unconfirmed, and now
+  additionally out of this phase's scope entirely (see above).
 - **Hashing cost for large files** is asserted to run in a worker but
-  never actually measured — same open item as in Storage Engine.
+  never actually measured — carried over unresolved from Storage (Phase 3) and Export (Phase 10)'s equivalent notes. `IAssetBlobStore.put()`
+  runs on the caller's thread at every current call site (tests only).
 
 ## UI layer
 

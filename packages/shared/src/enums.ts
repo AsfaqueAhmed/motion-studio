@@ -134,3 +134,16 @@ export enum TransitionType {
   WipeUp = "WipeUp",
   WipeDown = "WipeDown",
 }
+
+/**
+ * The five media categories the Asset Manager catalogs (PLAN.md Phase 12
+ * "Supported types"). One category can span several containers/codecs
+ * (e.g. `Video` covers MP4/MOV/WebM) — see `docs/14-assets/overview.md`.
+ */
+export enum AssetType {
+  Video = "Video",
+  Image = "Image",
+  Audio = "Audio",
+  Font = "Font",
+  LUT = "LUT",
+}

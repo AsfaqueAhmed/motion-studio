@@ -35,6 +35,7 @@ export interface AppEventMap {
   CommandRedone: { commandId: string };
   AssetImported: { assetId: AssetId };
   AssetImportFailed: { reason: string };
+  AssetDeleted: { assetId: AssetId };
 }
 
 export type AppEventType = keyof AppEventMap;
