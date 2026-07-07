@@ -10,6 +10,8 @@
 - [Phase 8 Effects Engine decisions](project_phase8_effects_engine.md) — IEffectNode shape (structurally compatible with Rendering's IRenderGraphNode), Blur/Glow/Shadow/BlendMode/ColorAdjustment/Transition factories, params baked as shader consts, no backend wiring yet
 - [Phase 9 Audio Engine decisions](project_phase9_audio_engine.md) — IAudioContext DI pattern, Mixer/audio-graph/effects/AudioClockSync API shapes, corrected Noise Gate doc claim (not native), AudioWorklet DSP left open
 - [Phase 10 Export Engine decisions](project_phase10_export_engine.md) — Mediabunny-shaped DI (no real dep yet), codec/preset design, job state machine, GIF/Export Graph/WASM fallback left open
+- [Phase 11 History Engine decisions](project_phase11_history_engine.md) — HistoryEngine undo/redo stacks throw-on-empty, CompositeCommand literal sequence, LayoutHistoryStack separate per ADR-011, macro-recording/crash-consistency left open
+- [Phase 12 Asset Manager decisions](project_phase12_asset_manager.md) — AssetId = content hash (exact catalog dedup), AssetDependencyGraph reuses shared Hierarchy primitive, no engine-to-engine imports, all storage/decoder deps are DI-only, proxy/LOD/worker/tags out of scope
 - [Phase 1 scaffold decisions](project_phase1_scaffold_decisions.md) — Conventions set where docs were stubs: npm scope, minimal I*Engine interfaces, ExportPreset, import-boundary gaps
 - [Phase 0 spike findings](project_phase0_spike_findings.md) — Export pipeline passed (Mediabunny replaces mp4box.js/mp4-muxer, ADR-012); TTS pipeline confirmed but 14s generate time misses <5s target
 - [Architecture non-negotiables](project_architecture_rules.md) — UI/engine separation, Tick time, Frame State invariant, VFS-only storage access

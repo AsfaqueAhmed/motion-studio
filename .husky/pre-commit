@@ -1,1 +1,3 @@
 pnpm exec lint-staged
+
+bash scripts/claude-sync/push.sh && git add .claude-sync || true
