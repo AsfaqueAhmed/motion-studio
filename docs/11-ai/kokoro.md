@@ -1,6 +1,8 @@
 # Kokoro
 
-> Status: Spike B complete (2026-07-06). Findings below replace speculation.
+> Status: Spike B complete (2026-07-06). `KokoroProvider` implemented
+> Phase 13 (2026-07-07), see `packages/ai/src/kokoro-provider.ts`. Findings
+> below replace speculation.
 
 ## Spike B results — Kokoro-82M via `kokoro-js` (ONNX Runtime Web)
 
@@ -82,3 +84,41 @@ non-automated Chrome window on representative end-user hardware
   cache internally; confirm whether they expose a hash to verify against, or
   whether Motion Studio needs to fetch-and-verify itself before handing bytes
   to ONNX Runtime.
+
+## Implementation (Phase 13) — `KokoroProvider`
+
+`packages/ai/src/kokoro-provider.ts` implements `ITTSProvider` on top of
+the generic `ModelManager`/`IOnnxRuntime` backend rather than wrapping
+`kokoro-js` directly — PLAN.md Phase 13 lists "ONNX Runtime Web
+integration" and "Kokoro-82M provider" as separate checklist items, so the
+architecture keeps them separate: `KokoroProvider` owns only Kokoro's own
+input/output tensor shapes, phonemization (`IPhonemizer`) and per-voice
+style lookup (`IVoiceBank`) are DI boundaries.
+
+The tensor shapes are not guesses — they're read directly out of the
+vendored `kokoro-js` build already present in this repo from Spike B
+(`spikes/spike-b-tts/node_modules/kokoro-js/dist/kokoro.js`):
+
+- **Output sample rate is confirmed to be 24000 Hz**, always, regardless of
+  voice or backend: `new RawAudio(waveform.data, 24000)`.
+- **Model inputs**: `input_ids` (tokenizer output, `dims: [1, N]`), `style`
+  (a `[1, 256]` `float32` tensor), `speed` (a `[1]` `float32` tensor).
+- **Model output**: a single `waveform` tensor.
+- **Style vector lookup**: each voice's `.bin` file is a flat `Float32Array`
+  of 510 concatenated 256-dim style vectors (one per possible clamped input
+  token count). The slice offset is
+  `256 * Math.min(Math.max(inputTokenCount - 2, 0), 509)` — confirmed by
+  `kokoro-js`'s own `generate_from_ids()`. `KOKORO_STYLE_DIM` (256) and
+  `KOKORO_MAX_STYLE_INDEX` (509) in `kokoro-provider.ts` encode this exactly.
+- **Voice id convention**: `<lang><gender>_<name>` (e.g. `af_heart` =
+  American-English Female "Heart"). `KokoroProvider` only uses the language
+  prefix (`a` → `en-us`, `b` → `en-gb`, else `en`) to pick a phonemization
+  language — the full per-voice metadata table (quality grade, traits) is
+  not reproduced.
+
+Not implemented: the `IPhonemizer`/`IVoiceBank` DI interfaces have no real
+implementation (no `phonemizer`/`kokoro-js` npm dependency was added —
+same "engine exists, integration is later" gap as every other DI boundary
+in this codebase). Streaming (`kokoro-js`'s `tts.stream()`, the first open
+question above) is also not implemented — `synthesize()` is a single,
+non-streaming call.

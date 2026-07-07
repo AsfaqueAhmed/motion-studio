@@ -1,1 +1,10 @@
-export {};
+export * from "./inference-backend";
+export * from "./model-store";
+export * from "./model-downloader";
+export * from "./model-manager";
+export * from "./capability-registry";
+export * from "./tts-provider";
+export * from "./kokoro-provider";
+export * from "./piper-provider";
+export * from "./voice-enhancer";
+export * from "./ai-manager";

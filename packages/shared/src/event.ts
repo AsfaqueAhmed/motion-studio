@@ -1,4 +1,4 @@
-import type { ExportJobStatus } from "./enums";
+import type { AICapability, ExportJobStatus } from "./enums";
 import type { AssetId, CompositionId, LayerId, ProjectId, TrackItemId } from "./ids";
 import type { Tick } from "./tick";
 
@@ -36,6 +36,11 @@ export interface AppEventMap {
   AssetImported: { assetId: AssetId };
   AssetImportFailed: { reason: string };
   AssetDeleted: { assetId: AssetId };
+  ModelDownloadProgressed: { modelId: string; progress: number };
+  ModelLoaded: { modelId: string };
+  ModelLoadFailed: { modelId: string; reason: string };
+  InferenceCompleted: { taskId: string; capability: AICapability };
+  InferenceFailed: { taskId: string; capability: AICapability; reason: string };
 }
 
 export type AppEventType = keyof AppEventMap;

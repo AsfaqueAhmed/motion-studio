@@ -365,18 +365,28 @@ catalog alongside the already-speculative `AssetImported`/
 
 ---
 
-## Phase 13 — AI Engine (`packages/ai`)
+## Phase 13 — AI Engine (`packages/ai`) ✅ complete (2026-07-07)
 
 Uses findings from **Spike B** — do not implement full TTS pipeline until Spike B is documented.
 
-- [ ] `CapabilityRegistry` — register/query AI capabilities (`TextToSpeech`, `BackgroundRemoval`, etc.)
-- [ ] ONNX Runtime Web integration (WebGPU EP primary, WASM EP fallback)
-- [ ] Model loading via OPFS cache (cold download → cache → warm load)
-- [ ] TTS provider interface: `ITTSProvider` (`synthesize(text, voice) → AudioBuffer`)
-- [ ] Kokoro-82M provider (implement based on Spike B findings)
-- [ ] Piper provider (implement based on Spike B findings — independent, interchangeable, not a pipeline stage)
-- [ ] Supertonic post-processing (optional voice enhancement stage, separate from TTS provider)
-- [ ] Background removal (ONNX segmentation model — post-MVP)
+- [x] `CapabilityRegistry` — register/query AI capabilities (`TextToSpeech`, `BackgroundRemoval`, etc.) — `CapabilityRegistry` (`capability-registry.ts`): `registerDescriptor`/`registerProvider`/`resolveProvider`, see `docs/11-ai/provider-system.md`
+- [x] ONNX Runtime Web integration (WebGPU EP primary, WASM EP fallback) — `InferenceBackend`/`resolveInferenceBackend`/`IOnnxRuntime`/`IInferenceSession` (`inference-backend.ts`), DI interfaces structurally matching `onnxruntime-web`'s real `Tensor`/`InferenceSession` API (confirmed against the vendored `kokoro-js` build from Spike B); no real `onnxruntime-web` dependency added yet, see `docs/11-ai/overview.md`
+- [x] Model loading via OPFS cache (cold download → cache → warm load) — `ModelManager.ensureLoaded` (`model-manager.ts`): checks `IModelBlobStore` first (warm), else `downloadAndVerify` + store (cold) before creating a session; `IModelBlobStore` is DI-only, no OPFS wired yet, see `docs/11-ai/model-manager.md`
+- [x] TTS provider interface: `ITTSProvider` (`synthesize(text, voice) → AudioBuffer`) — `ITTSProvider`/`ISynthesizedAudio` (`tts-provider.ts`); `ISynthesizedAudio` is a hand-rolled structural subset of `AudioBuffer` (sample rate, channel data), not `lib.dom`'s type, matching Audio's own `IAudioBuffer` DI pattern
+- [x] Kokoro-82M provider (implement based on Spike B findings) — `KokoroProvider` (`kokoro-provider.ts`): input/output tensor names (`input_ids`/`style`/`speed` → `waveform`), 24kHz output, and the style-vector offset formula are all confirmed against the vendored `kokoro-js` source, not guessed, see `docs/11-ai/kokoro.md` "Implementation (Phase 13)"
+- [x] Piper provider (implement based on Spike B findings — independent, interchangeable, not a pipeline stage) — `PiperProvider` (`piper-provider.ts`) implements the same `ITTSProvider` shape, proving the "independent provider, not a pipeline stage" architecture; its tensor names are **placeholders**, unverified against any real Piper export, see `docs/11-ai/piper.md`
+- [x] Supertonic post-processing (optional voice enhancement stage, separate from TTS provider) — `IVoiceEnhancer`/`registerVoiceEnhancer` (`voice-enhancer.ts`), registration-only plumbing matching Export's `wasm-fallback.ts` precedent; no real enhancer ships, see `docs/11-ai/supertonic.md`
+- [x] Background removal (ONNX segmentation model — post-MVP) — **intentionally not implemented**, exactly as this checklist item itself labels it ("post-MVP"); `AICapability.BackgroundRemoval` exists in `@motion-studio/shared` with no provider, matching every other unfulfilled `AICapability` value
+
+Note: `AIManager` (`ai-manager.ts`) is a thin `IEngine` facade over
+`CapabilityRegistry` + `ModelManager` + registered `ITTSProvider`s,
+matching `AssetManager`/`ExportEngine`'s split. `InferenceCompleted`/
+`InferenceFailed`/`ModelDownloadProgressed`/`ModelLoaded`/`ModelLoadFailed`
+were added to `@motion-studio/shared`'s event catalog this phase. Task
+queue / priority scheduling / worker dispatch (`docs/11-ai/ai-manager.md`'s
+original scope) is **not implemented** — every call runs synchronously on
+the caller's thread, the same gap as Export's job runner and Assets'
+import pipeline.
 
 ---
 
