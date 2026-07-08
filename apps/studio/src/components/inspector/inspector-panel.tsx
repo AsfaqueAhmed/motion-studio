@@ -53,19 +53,6 @@ export function InspectorPanel(): JSX.Element {
     });
   };
 
-  const addKeyframe = (row: IPropertySchemaRow): void => {
-    kernel.inspectorEditor.addKeyframe({
-      type: "AddKeyframe",
-      payload: {
-        layerId: layer.id,
-        layerType: layer.type,
-        propertyKey: row.key,
-        tick: currentTick,
-        value: displayValue(row),
-      },
-    });
-  };
-
   return (
     <aside className="absolute right-4 top-4 z-20 flex max-h-[calc(100%-2rem)] w-64 flex-col gap-2 overflow-y-auto rounded-xl border border-editor-border bg-editor-surface p-3 text-xs shadow-2xl shadow-black/50">
       <h2 className="text-sm font-semibold">{layer.name}</h2>
@@ -79,16 +66,6 @@ export function InspectorPanel(): JSX.Element {
             value={displayValue(row)}
             onChange={(value) => setProperty(row, value)}
           />
-          {row.animatable && (
-            <button
-              type="button"
-              title="Add keyframe"
-              onClick={() => addKeyframe(row)}
-              className="ml-auto shrink-0 text-editor-accent"
-            >
-              ◆
-            </button>
-          )}
         </div>
       ))}
     </aside>

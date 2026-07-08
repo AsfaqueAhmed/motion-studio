@@ -23,7 +23,8 @@ import { getLayerPropertyValue } from "./layer-property-path";
  */
 const PLACEHOLDER_BOUNDS: IBounds = { x: 0, y: 0, width: 200, height: 200 };
 
-const TRANSFORM_KEYS = ["x", "y", "scaleX", "scaleY", "rotation"] as const;
+/** Also the set the unified keyframe toggle animates together — see `InspectorEditorService.toggleKeyframe`. */
+export const TRANSFORM_KEYS = ["x", "y", "scaleX", "scaleY", "rotation"] as const;
 
 /**
  * Timeline + Animation + Layer → Frame State (`ARCHITECTURE.md` §4). This

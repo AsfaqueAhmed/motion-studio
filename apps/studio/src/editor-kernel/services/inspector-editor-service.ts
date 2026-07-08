@@ -1,8 +1,14 @@
 import {
   createAnimationClipId,
   createPropertyTrackId,
+  type IAnimationClip,
   type ICommand,
+  type ILayer,
+  type IPropertyTrack,
   type ITransform2D,
+  type LayerId,
+  type LayerType,
+  type Tick,
 } from "@motion-studio/shared";
 import { CompositeCommand } from "@motion-studio/history";
 import {
@@ -10,6 +16,7 @@ import {
   createKeyframe,
   createPropertyTrack,
   AddKeyframeCommand,
+  DeleteKeyframeCommand,
   type AnimationEngine,
 } from "@motion-studio/animation";
 import type { LayerEngine } from "@motion-studio/layer";
@@ -17,10 +24,12 @@ import type { CommandBus } from "../command-bus";
 import { AddAnimationClipCommand } from "../commands/add-animation-clip-command";
 import { AddPropertyTrackCommand } from "../commands/add-property-track-command";
 import { UpdateLayerCommand } from "../commands/update-layer-command";
+import { TRANSFORM_KEYS } from "../frame-state-builder";
+import { getLayerPropertyValue } from "../layer-property-path";
 import type {
-  IAddKeyframeIntent,
   ISetLayerPropertyIntent,
   ISetLayerTransformIntent,
+  IToggleKeyframeIntent,
 } from "../intents";
 
 /** Resolves Inspector-shaped Intents (static edits + keyframing) into Commands. See `TimelineEditorService`'s doc comment on staying a thin façade. */
@@ -57,41 +66,101 @@ export class InspectorEditorService {
     this.commandBus.execute(new CompositeCommand(crypto.randomUUID(), "Transform layer", commands));
   }
 
-  /** Adds a keyframe, creating the Clip and/or PropertyTrack it needs first if this is the property's first keyframe. */
-  addKeyframe(intent: IAddKeyframeIntent): void {
-    const { layerId, layerType, propertyKey, tick, value } = intent.payload;
-    const commands: ICommand[] = [];
+  /**
+   * CapCut-style unified keyframe: one toggle for the whole transform
+   * (`TRANSFORM_KEYS` — x, y, scaleX, scaleY, rotation together), not one
+   * button per property. If any of those tracks already has a keyframe at
+   * `tick`, this removes it (and any sibling keyframes at that same tick);
+   * otherwise it adds one per transform key, creating the Clip/PropertyTrack
+   * containers it needs first, same as the property-editing flow's
+   * "first keyframe on this property" lazy-create. Always one
+   * `CompositeCommand` — one undo step for the whole toggle either way.
+   */
+  toggleKeyframe(intent: IToggleKeyframeIntent): void {
+    const { layerId, layerType, tick } = intent.payload;
+    const layer = this.layerEngine.registry.get(layerId);
+    if (!layer) {
+      return;
+    }
 
-    let clip = this.animationEngine.getClipForLayer(layerId);
-    if (!clip) {
-      clip = createAnimationClip({
+    const clip = this.animationEngine.getClipForLayer(layerId);
+    const tracksByKey = new Map(
+      TRANSFORM_KEYS.map((key) => [
+        key,
+        clip?.propertyTrackIds
+          .map((id) => this.animationEngine.propertyTracks.get(id))
+          .find((existing) => existing?.propertyKey === `transform.${key}`),
+      ]),
+    );
+
+    const existingAtTick = [...tracksByKey.values()].filter(
+      (track): track is IPropertyTrack =>
+        !!track && track.keyframes.some((keyframe) => keyframe.tick === tick),
+    );
+
+    const commands: ICommand[] =
+      existingAtTick.length > 0
+        ? existingAtTick.map(
+            (track) =>
+              new DeleteKeyframeCommand(crypto.randomUUID(), this.animationEngine, track.id, tick),
+          )
+        : this.buildKeyframeAddCommands(layer, layerId, layerType, tick, clip, tracksByKey);
+
+    if (commands.length === 0) {
+      return;
+    }
+    this.commandBus.execute(new CompositeCommand(crypto.randomUUID(), "Toggle keyframe", commands));
+  }
+
+  private buildKeyframeAddCommands(
+    layer: ILayer,
+    layerId: LayerId,
+    layerType: LayerType,
+    tick: Tick,
+    clip: IAnimationClip | undefined,
+    tracksByKey: Map<(typeof TRANSFORM_KEYS)[number], IPropertyTrack | undefined>,
+  ): ICommand[] {
+    const commands: ICommand[] = [];
+    let targetClip = clip;
+    if (!targetClip) {
+      targetClip = createAnimationClip({
         id: createAnimationClipId(crypto.randomUUID()),
         layerId,
         layerType,
-        name: `${layerType} animation`,
+        name: "Transform",
       });
-      commands.push(new AddAnimationClipCommand(crypto.randomUUID(), this.animationEngine, clip));
+      commands.push(
+        new AddAnimationClipCommand(crypto.randomUUID(), this.animationEngine, targetClip),
+      );
     }
 
-    let track = clip.propertyTrackIds
-      .map((id) => this.animationEngine.propertyTracks.get(id))
-      .find((existing) => existing?.propertyKey === propertyKey);
-    if (!track) {
-      const definition = this.animationEngine.properties.require(layerType, propertyKey);
-      track = createPropertyTrack({
-        id: createPropertyTrackId(crypto.randomUUID()),
-        clipId: clip.id,
-        propertyKey,
-        valueType: definition.valueType,
-      });
-      commands.push(new AddPropertyTrackCommand(crypto.randomUUID(), this.animationEngine, track));
+    for (const key of TRANSFORM_KEYS) {
+      const propertyKey = `transform.${key}`;
+      let track = tracksByKey.get(key);
+      if (!track) {
+        const definition = this.animationEngine.properties.require(layerType, propertyKey);
+        track = createPropertyTrack({
+          id: createPropertyTrackId(crypto.randomUUID()),
+          clipId: targetClip.id,
+          propertyKey,
+          valueType: definition.valueType,
+        });
+        commands.push(
+          new AddPropertyTrackCommand(crypto.randomUUID(), this.animationEngine, track),
+        );
+      }
+      const evaluated = this.animationEngine.evaluateAt(layerId, propertyKey, tick);
+      const value = evaluated !== undefined ? evaluated : getLayerPropertyValue(layer, propertyKey);
+      commands.push(
+        new AddKeyframeCommand(
+          crypto.randomUUID(),
+          this.animationEngine,
+          track.id,
+          createKeyframe({ tick, value }),
+        ),
+      );
     }
 
-    const keyframe = createKeyframe({ tick, value });
-    commands.push(
-      new AddKeyframeCommand(crypto.randomUUID(), this.animationEngine, track.id, keyframe),
-    );
-
-    this.commandBus.execute(new CompositeCommand(crypto.randomUUID(), "Add keyframe", commands));
+    return commands;
   }
 }

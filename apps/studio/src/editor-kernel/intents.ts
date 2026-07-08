@@ -67,13 +67,15 @@ export type ISetLayerTransformIntent = IIntent<
   { readonly layerId: LayerId; readonly transform: Partial<ITransform2D> }
 >;
 
-export type IAddKeyframeIntent = IIntent<
-  "AddKeyframe",
-  {
-    readonly layerId: LayerId;
-    readonly layerType: LayerType;
-    readonly propertyKey: string;
-    readonly tick: Tick;
-    readonly value: unknown;
-  }
+/**
+ * CapCut-style unified keyframe: one toggle for the whole transform (x, y,
+ * scaleX, scaleY, rotation together — the same set
+ * `frame-state-builder.ts`'s `TRANSFORM_KEYS` names) at a tick, not one
+ * button per property. If a keyframe already exists at `tick` this removes
+ * it; otherwise it adds one for every transform key, capturing each
+ * property's current value.
+ */
+export type IToggleKeyframeIntent = IIntent<
+  "ToggleKeyframe",
+  { readonly layerId: LayerId; readonly layerType: LayerType; readonly tick: Tick }
 >;

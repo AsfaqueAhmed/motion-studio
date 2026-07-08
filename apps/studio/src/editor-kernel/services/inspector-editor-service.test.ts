@@ -59,67 +59,66 @@ describe("InspectorEditorService", () => {
     expect(commandBus.canUndo).toBe(false);
   });
 
-  it("creates the Clip and PropertyTrack for a Layer's first keyframe", () => {
-    service.addKeyframe({
-      type: "AddKeyframe",
-      payload: {
-        layerId,
-        layerType: layerEngine.registry.get(layerId)!.type,
-        propertyKey: "opacity",
-        tick: toTick(0),
-        value: 0.2,
-      },
+  it("toggling on creates the Clip and a PropertyTrack for all 5 transform keys, in one undo step", () => {
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType: layerEngine.registry.get(layerId)!.type, tick: toTick(0) },
     });
 
     const clip = animationEngine.getClipForLayer(layerId);
     expect(clip).toBeDefined();
-    expect(animationEngine.evaluateAt(layerId, "opacity", toTick(0))).toBe(0.2);
+    for (const [key, expected] of [
+      ["x", 0],
+      ["y", 0],
+      ["scaleX", 1],
+      ["scaleY", 1],
+      ["rotation", 0],
+    ] as const) {
+      expect(animationEngine.evaluateAt(layerId, `transform.${key}`, toTick(0))).toBe(expected);
+    }
+    expect(commandBus.canUndo).toBe(true);
   });
 
-  it("undoing the first keyframe also removes the Clip/PropertyTrack it created", () => {
-    service.addKeyframe({
-      type: "AddKeyframe",
-      payload: {
-        layerId,
-        layerType: layerEngine.registry.get(layerId)!.type,
-        propertyKey: "opacity",
-        tick: toTick(0),
-        value: 0.2,
-      },
+  it("undoing the toggle-on removes the Clip/PropertyTracks it created, as one step", () => {
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType: layerEngine.registry.get(layerId)!.type, tick: toTick(0) },
     });
 
     commandBus.undo();
 
     expect(animationEngine.getClipForLayer(layerId)).toBeUndefined();
+    expect(commandBus.canUndo).toBe(false);
   });
 
-  it("reuses the existing Clip/PropertyTrack for a second keyframe on the same property", () => {
-    service.addKeyframe({
-      type: "AddKeyframe",
-      payload: {
-        layerId,
-        layerType: layerEngine.registry.get(layerId)!.type,
-        propertyKey: "opacity",
-        tick: toTick(0),
-        value: 0.2,
-      },
+  it("toggling again at the same tick removes the keyframes it just added (toggle off)", () => {
+    const layerType = layerEngine.registry.get(layerId)!.type;
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType, tick: toTick(0) },
+    });
+
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType, tick: toTick(0) },
+    });
+
+    expect(animationEngine.evaluateAt(layerId, "transform.x", toTick(0))).toBeUndefined();
+  });
+
+  it("toggling at a different tick reuses the existing Clip instead of creating a second one", () => {
+    const layerType = layerEngine.registry.get(layerId)!.type;
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType, tick: toTick(0) },
     });
     const clipAfterFirst = animationEngine.getClipForLayer(layerId);
 
-    service.addKeyframe({
-      type: "AddKeyframe",
-      payload: {
-        layerId,
-        layerType: layerEngine.registry.get(layerId)!.type,
-        propertyKey: "opacity",
-        tick: toTick(90),
-        value: 0.8,
-      },
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType, tick: toTick(90) },
     });
 
-    expect(animationEngine.getClipForLayer(layerId)?.id).toBe(clipAfterFirst?.id);
-
-    commandBus.undo();
     expect(animationEngine.getClipForLayer(layerId)?.id).toBe(clipAfterFirst?.id);
   });
 });
