@@ -7,12 +7,21 @@ EPHEMERAL per-frame Scene Graph, rebuilt from Frame State and destroyed after ea
 `ISceneGraphNode` is deliberately **flat** — no parent/child of its own.
 Frame State layers already carry fully evaluated (Timeline + Animation
 applied) local transforms, so hierarchy lives one layer up in the
-persistent Composition Graph; Scene Graph nodes are just `{ layerId, type,
-transform, opacity, zIndex, bounds, properties }`.
+persistent Composition Graph; Scene Graph nodes are `{ layerId, type,
+transform, opacity, zIndex, bounds, assetId, texture, properties }`.
 
-`buildSceneGraph(frameState): ISceneGraph` is a pure mapping —
+`buildSceneGraph(frameState, textureProvider?): ISceneGraph` maps
 `frameState.layers` → `sceneGraph.nodes`, carrying `tick`/`compositionId`/
-`width`/`height` straight through.
+`width`/`height` straight through. For a layer with an `assetId` (Image/
+Video/Sticker/Audio), it calls the injected `ITextureSourceProvider.resolve`
+(`texture-source.ts`) and attaches the result as `node.texture` — a
+synchronous cache read; a miss returns `undefined` for that frame rather
+than blocking, and the node falls back to the placeholder-color path until
+resolution finishes. `RenderingEngine`'s constructor takes this provider
+and passes it through on every `renderFrame` call. `packages/rendering`
+itself stays DOM-decode-free — the actual `createImageBitmap`/`<video>`
+decoding lives in `apps/studio`'s `TextureSourceResolver`, injected by
+`CanvasPanel` (see `renderer-overview.md`).
 
 `IFrameStateLayer` gained a `bounds: IBounds` field (local-space, pre-transform)
 during this phase — the Scene Graph needs it for culling/dirty-rect and
@@ -41,13 +50,20 @@ a true rotated rect.
 
 ## Open questions
 
-- **Real pixel content.** Every backend today draws a flat placeholder
-  color per node (`placeholder-color.ts`) instead of decoded video/image
-  textures, rasterized text, or vector shape fills — those pipelines
-  (Assets decode, text layout, shape tessellation) don't exist yet
-  (Phases 8/9/12). Wiring real content in is additive: swap
-  `placeholderColor(node.layerId)` for a real texture/paint lookup once
-  those engines land.
+- **Real pixel content — Image/Video only.** All four backends now draw
+  real decoded content for Image/Video/Sticker/Audio layers when a texture
+  resolves (`ITextureSource`: `image-source` for Canvas2D/WebGL2/WebGPU,
+  `raw-rgba` for Software). Text/Shape/Group layers still draw a flat
+  placeholder-colored rect (`placeholder-color.ts`) — those need their own
+  intrinsic-size model and rasterization/tessellation pipeline first (text
+  layout, shape tessellation; still not built).
+- **Export path.** `frame-state-builder`/Scene Graph are shared between
+  Preview and Export, but only `CanvasPanel` currently constructs a
+  `TextureSourceResolver` and passes it to `RenderingEngine`. The Export
+  Engine runs headless and doesn't wire one in yet — until it does, an
+  exported video's Image/Video layers still render as placeholder rects,
+  breaking the preview/export pixel-identity invariant for asset-backed
+  layers specifically. Flagged, not fixed, here.
 - **Virtualization for Timeline UI / Canvas overlays.** `DirtyTrackedGraph`
   supports parent/child + viewport queries generically (`queryVisible`),
   but Rendering's own instantiation doesn't use that part (see above) —

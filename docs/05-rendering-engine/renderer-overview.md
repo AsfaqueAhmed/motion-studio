@@ -53,9 +53,21 @@ Frame State → Scene Graph (`buildSceneGraph`) → dirty-tracking
 `frame-rendering.md`, `compositor.md`, `webgpu.md`, `webgl.md`,
 `canvas-fallback.md` for each piece's detail.
 
-Content is still a flat placeholder color per node (`placeholder-color.ts`)
-— no real decoded/rasterized pixel content exists yet; that's additive once
-Assets/Effects/text-layout land (Phases 8/9/12).
+**Image/Video/Sticker/Audio layers now draw real decoded content** in all
+four backends, via an injected `ITextureSourceProvider`
+(`texture-source.ts`) that `RenderingEngine`'s constructor accepts and
+`buildSceneGraph` calls per asset-backed node. The provider itself —
+`apps/studio`'s `TextureSourceResolver` — is the only DOM-decode-coupled
+piece; it's constructed and owned by `CanvasPanel` (same "needs a mounted
+`<canvas>`/DOM" lifecycle reasoning as `RenderingEngine` itself), using the
+same `createImageBitmap`/`<video>` browser-API patterns that already
+existed one-shot in `apps/studio`'s asset metadata/thumbnail pipelines.
+`packages/rendering` never imports DOM decode APIs directly — see
+`scene-graph.md`. Text/Shape/Group layers still draw a flat placeholder
+color per node (`placeholder-color.ts`) — those need their own intrinsic-size
+model and rasterization/tessellation pipeline first (Phase 8/9 territory,
+still not built). The Export Engine doesn't wire a texture provider in yet
+either — see `scene-graph.md` "Open questions".
 
 ## Known gaps — resolved this phase
 
