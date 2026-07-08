@@ -88,6 +88,7 @@ export function buildFrameState(
         opacity,
         zIndex: trackIndex,
         bounds: PLACEHOLDER_BOUNDS,
+        assetId: "assetId" in layer ? layer.assetId : undefined,
         properties,
       });
     }

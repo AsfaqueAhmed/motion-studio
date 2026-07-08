@@ -1,6 +1,7 @@
 export * from "./render-backend";
 export * from "./backend-detection";
 export * from "./scene-graph";
+export * from "./texture-source";
 export * from "./render-queue";
 export * from "./render-graph";
 export * from "./transform";

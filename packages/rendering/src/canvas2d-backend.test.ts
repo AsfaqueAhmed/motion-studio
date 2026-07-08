@@ -15,6 +15,8 @@ function node(
     opacity: 1,
     zIndex: 0,
     bounds: { x: 0, y: 0, width: 10, height: 10 },
+    assetId: undefined,
+    texture: undefined,
     properties: {},
     ...rest,
   };

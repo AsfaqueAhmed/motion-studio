@@ -1,6 +1,7 @@
 import type { IEngine, IFrameState, LayerId } from "@motion-studio/shared";
 import type { IRenderBackend, IRenderTargetSize } from "./render-backend";
 import { buildSceneGraph, SceneGraphDirtyTracker, type ISceneGraph } from "./scene-graph";
+import type { ITextureSourceProvider } from "./texture-source";
 
 /**
  * Owns "Frame State → (ephemeral, per-frame) Scene Graph → Render Graph →
@@ -16,10 +17,12 @@ export class RenderingEngine implements IEngine {
   readonly name = "Rendering";
 
   private readonly backend: IRenderBackend;
+  private readonly textureProvider: ITextureSourceProvider | undefined;
   private readonly dirtyTracker = new SceneGraphDirtyTracker();
 
-  constructor(backend: IRenderBackend) {
+  constructor(backend: IRenderBackend, textureProvider?: ITextureSourceProvider) {
     this.backend = backend;
+    this.textureProvider = textureProvider;
   }
 
   initialize(): void {}
@@ -36,7 +39,7 @@ export class RenderingEngine implements IEngine {
 
   /** Builds the Scene Graph for `frameState`, updates dirty-tracking, and draws it. Returns the built Scene Graph for inspection/testing. */
   async renderFrame(frameState: IFrameState): Promise<ISceneGraph> {
-    const sceneGraph = buildSceneGraph(frameState);
+    const sceneGraph = buildSceneGraph(frameState, this.textureProvider);
     this.dirtyTracker.update(sceneGraph);
     await this.backend.drawFrame(sceneGraph);
     return sceneGraph;

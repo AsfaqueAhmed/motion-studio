@@ -1,5 +1,6 @@
 import {
   DirtyTrackedGraph,
+  type AssetId,
   type CompositionId,
   type IBounds,
   type IFrameState,
@@ -9,6 +10,7 @@ import {
   type LayerType,
   type Tick,
 } from "@motion-studio/shared";
+import type { ITextureSource, ITextureSourceProvider } from "./texture-source";
 
 /**
  * One drawable node in a Scene Graph — see GLOSSARY.md "Scene Graph" and
@@ -24,6 +26,9 @@ export interface ISceneGraphNode {
   readonly opacity: number;
   readonly zIndex: number;
   readonly bounds: IBounds;
+  readonly assetId: AssetId | undefined;
+  /** Resolved by an injected `ITextureSourceProvider` — see `placeholder-color.ts` for the fallback when this is `undefined`. */
+  readonly texture: ITextureSource | undefined;
   readonly properties: Readonly<Record<string, unknown>>;
 }
 
@@ -36,7 +41,10 @@ export interface ISceneGraph {
   readonly nodes: readonly ISceneGraphNode[];
 }
 
-function toSceneGraphNode(layer: IFrameStateLayer): ISceneGraphNode {
+function toSceneGraphNode(
+  layer: IFrameStateLayer,
+  textureProvider: ITextureSourceProvider | undefined,
+): ISceneGraphNode {
   return {
     layerId: layer.layerId,
     type: layer.type,
@@ -44,18 +52,27 @@ function toSceneGraphNode(layer: IFrameStateLayer): ISceneGraphNode {
     opacity: layer.opacity,
     zIndex: layer.zIndex,
     bounds: layer.bounds,
+    assetId: layer.assetId,
+    texture: layer.assetId !== undefined ? textureProvider?.resolve(layer.assetId) : undefined,
     properties: layer.properties,
   };
 }
 
-/** Builds the ephemeral Scene Graph for one Frame State. Pure — no dirty-tracking side effects. */
-export function buildSceneGraph(frameState: IFrameState): ISceneGraph {
+/**
+ * Builds the ephemeral Scene Graph for one Frame State. Pure with respect to
+ * dirty-tracking (no side effects there), but `textureProvider.resolve` may
+ * itself warm a decode cache in the background — see `ITextureSourceProvider`.
+ */
+export function buildSceneGraph(
+  frameState: IFrameState,
+  textureProvider?: ITextureSourceProvider,
+): ISceneGraph {
   return {
     tick: frameState.tick,
     compositionId: frameState.compositionId,
     width: frameState.width,
     height: frameState.height,
-    nodes: frameState.layers.map(toSceneGraphNode),
+    nodes: frameState.layers.map((layer) => toSceneGraphNode(layer, textureProvider)),
   };
 }
 

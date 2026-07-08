@@ -18,6 +18,7 @@ function makeLayer(overrides: Partial<IFrameStateLayer> = {}): IFrameStateLayer 
     opacity: 1,
     zIndex: 0,
     bounds: { x: 0, y: 0, width: 4, height: 4 },
+    assetId: undefined,
     properties: {},
     ...overrides,
   };
