@@ -2,14 +2,18 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { RenderingEngine, worldBounds, type IRenderBackend } from "@motion-studio/rendering";
+import { createKeyframe } from "@motion-studio/animation";
 import {
   PlaybackState,
   ticksToSeconds,
   type IFrameState,
   type ITransform2D,
   type LayerId,
+  type PropertyTrackId,
+  type Tick,
 } from "@motion-studio/shared";
 import { useEditorKernel } from "../editor-kernel-provider";
+import type { EditorKernel } from "../../editor-kernel/editor-kernel";
 import { useCanvasStore } from "../../state/use-canvas-store";
 import { useTimelineStore } from "../../state/use-timeline-store";
 import { useEngineRevisionStore } from "../../state/use-engine-revision-store";
@@ -28,12 +32,32 @@ interface IPoint {
   readonly y: number;
 }
 
+type ITransformKey = "x" | "y" | "scaleX" | "scaleY";
+
+/**
+ * Where a live-dragged value for one transform key actually needs to go to
+ * be visible. Frame State evaluation always prefers a keyframed value over
+ * the Layer's plain static field whenever a track exists for that
+ * property — so once a property is animated, writing the static field
+ * during a drag has zero visible effect (the old bug: the layer looked
+ * frozen mid-drag, then jumped once `handlePointerUp` finally touched the
+ * real keyframe). Computed once per drag (`planKeyMutation`), applied live
+ * on every `pointermove` (`applyLivePreview`), and unwound back to the
+ * pre-drag state on `pointerup` before the one real Command commits.
+ */
+type IKeyMutationPlan =
+  | { readonly kind: "static" }
+  | { readonly kind: "keyframe"; readonly trackId: PropertyTrackId; readonly originalValue: number }
+  | { readonly kind: "new-keyframe"; readonly trackId: PropertyTrackId };
+
 type IDragState =
   | {
       readonly mode: "move";
       readonly layerId: LayerId;
       readonly startTransform: ITransform2D;
       readonly startPointerCanvas: IPoint;
+      readonly tick: Tick;
+      readonly mutationPlan: ReadonlyMap<ITransformKey, IKeyMutationPlan>;
     }
   | {
       readonly mode: "scale";
@@ -45,7 +69,96 @@ type IDragState =
       readonly fixedCornerLocal: IPoint;
       /** The dragged corner's world position at drag start — defines the original diagonal the pointer's movement is projected onto. */
       readonly draggedCornerWorldStart: IPoint;
+      readonly tick: Tick;
+      readonly mutationPlan: ReadonlyMap<ITransformKey, IKeyMutationPlan>;
     };
+
+/** One-time-per-drag lookup of how each key needs to be live-mutated — see `IKeyMutationPlan`. */
+function planKeyMutations(
+  kernel: EditorKernel,
+  layerId: LayerId,
+  keys: readonly ITransformKey[],
+  tick: Tick,
+): Map<ITransformKey, IKeyMutationPlan> {
+  const plan = new Map<ITransformKey, IKeyMutationPlan>();
+  const clip = kernel.animationEngine.getClipForLayer(layerId);
+  for (const key of keys) {
+    const track = clip?.propertyTrackIds
+      .map((id) => kernel.animationEngine.propertyTracks.get(id))
+      .find((existing) => existing?.propertyKey === `transform.${key}`);
+    if (!track) {
+      plan.set(key, { kind: "static" });
+      continue;
+    }
+    const keyframe = track.keyframes.find((existing) => existing.tick === tick);
+    plan.set(
+      key,
+      keyframe
+        ? { kind: "keyframe", trackId: track.id, originalValue: keyframe.value as number }
+        : { kind: "new-keyframe", trackId: track.id },
+    );
+  }
+  return plan;
+}
+
+/** Applies one key's live value per its plan — mutates the real keyframe (or a throwaway one) directly, bypassing the Command Bus, same as the static-field case already did. */
+function applyLivePreview(
+  kernel: EditorKernel,
+  plan: IKeyMutationPlan,
+  tick: Tick,
+  value: number,
+): void {
+  if (plan.kind === "static") {
+    return;
+  }
+  const track = kernel.animationEngine.propertyTracks.get(plan.trackId);
+  if (!track) {
+    return;
+  }
+  const existing = track.keyframes.find((keyframe) => keyframe.tick === tick);
+  if (existing) {
+    existing.value = value;
+    return;
+  }
+  track.keyframes = [...track.keyframes, createKeyframe({ tick, value })].sort(
+    (a, b) => a.tick - b.tick,
+  );
+}
+
+/** Undoes `applyLivePreview`'s ephemeral mutation for one key, before the real commit. */
+function restoreLivePreview(kernel: EditorKernel, plan: IKeyMutationPlan, tick: Tick): void {
+  if (plan.kind === "static") {
+    return;
+  }
+  const track = kernel.animationEngine.propertyTracks.get(plan.trackId);
+  if (!track) {
+    return;
+  }
+  if (plan.kind === "keyframe") {
+    const keyframe = track.keyframes.find((existing) => existing.tick === tick);
+    if (keyframe) {
+      keyframe.value = plan.originalValue;
+    }
+    return;
+  }
+  track.keyframes = track.keyframes.filter((keyframe) => keyframe.tick !== tick);
+}
+
+/** Current value for one key per its plan — used to read the settled final value right before `restoreLivePreview` reverts it. */
+function readLiveValue(
+  kernel: EditorKernel,
+  plan: IKeyMutationPlan,
+  tick: Tick,
+  transform: ITransform2D,
+  key: ITransformKey,
+): number {
+  if (plan.kind === "static") {
+    return transform[key];
+  }
+  const track = kernel.animationEngine.propertyTracks.get(plan.trackId);
+  const keyframe = track?.keyframes.find((existing) => existing.tick === tick);
+  return (keyframe?.value as number | undefined) ?? transform[key];
+}
 
 /** TL, TR, BL, BR — index `i`'s opposite corner is always `3 - i`. Same order for a local (`layer.bounds`) or world (`worldBounds(...)`) box. */
 function boxCorners(box: { x: number; y: number; width: number; height: number }): IPoint[] {
@@ -237,12 +350,16 @@ export function CanvasPanel(): JSX.Element {
   };
 
   /**
-   * Live preview during an active drag: mutates the layer already sitting in
-   * `layerEngine.registry` in place (same replace-the-object convention
-   * `setLayerPropertyValue` uses) and repaints immediately, bypassing the
-   * Command Bus entirely. Deliberate: this is ephemeral interaction state,
-   * not yet a committed edit — `handlePointerUp` is what actually records
-   * one undoable Command, once the gesture ends.
+   * Live preview during an active drag. For a key `dragState.mutationPlan`
+   * marks `"static"`, this mutates the layer's plain transform field in
+   * place (same replace-the-object convention `setLayerPropertyValue`
+   * uses). For an already-animated key, writing the static field would be
+   * invisible (Frame State evaluation always prefers a keyframed value
+   * over it), so `applyLivePreview` mutates the real keyframe — or a
+   * throwaway one, for a tick with no keyframe yet — directly instead.
+   * Either way this bypasses the Command Bus entirely: it's ephemeral
+   * interaction state, not yet a committed edit — `handlePointerUp` unwinds
+   * it and records exactly one real Command once the gesture ends.
    */
   const handlePointerMove = (event: PointerEvent): void => {
     const dragState = dragStateRef.current;
@@ -255,9 +372,9 @@ export function CanvasPanel(): JSX.Element {
       return;
     }
 
+    let newValues: Partial<Record<ITransformKey, number>>;
     if (dragState.mode === "move") {
-      layer.transform = {
-        ...dragState.startTransform,
+      newValues = {
         x: dragState.startTransform.x + (point.x - dragState.startPointerCanvas.x),
         y: dragState.startTransform.y + (point.y - dragState.startPointerCanvas.y),
       };
@@ -283,18 +400,34 @@ export function CanvasPanel(): JSX.Element {
       );
       const scaleX = startTransform.scaleX * scaleFactor;
       const scaleY = startTransform.scaleY * scaleFactor;
-      layer.transform = {
-        ...startTransform,
+      newValues = {
         scaleX,
         scaleY,
         x: fixedCornerWorld.x - (fixedCornerLocal.x - startTransform.anchorX) * scaleX,
         y: fixedCornerWorld.y - (fixedCornerLocal.y - startTransform.anchorY) * scaleY,
       };
     }
+
+    const staticPatch: Partial<ITransform2D> = {};
+    for (const key of Object.keys(newValues) as ITransformKey[]) {
+      const value = newValues[key];
+      if (value === undefined) {
+        continue;
+      }
+      const plan = dragState.mutationPlan.get(key) ?? { kind: "static" as const };
+      if (plan.kind === "static") {
+        staticPatch[key] = value;
+      } else {
+        applyLivePreview(kernel, plan, dragState.tick, value);
+      }
+    }
+    if (Object.keys(staticPatch).length > 0) {
+      layer.transform = { ...layer.transform, ...staticPatch };
+    }
     renderCurrentFrame();
   };
 
-  /** Restores the pre-drag transform, then dispatches exactly one batched Command — see `setLayerTransform`'s doc comment on why this needs to be one undo step, not several. */
+  /** Unwinds `applyLivePreview`'s ephemeral mutations back to the pre-drag state, then dispatches exactly one batched Command — see `setLayerTransform`'s doc comment on why this needs to be one undo step, not several. */
   const handlePointerUp = (): void => {
     const dragState = dragStateRef.current;
     dragStateRef.current = null;
@@ -305,23 +438,23 @@ export function CanvasPanel(): JSX.Element {
     if (!layer) {
       return;
     }
-    const finalTransform = layer.transform;
+
+    const keys: ITransformKey[] =
+      dragState.mode === "move" ? ["x", "y"] : ["x", "y", "scaleX", "scaleY"];
+    const finalTransform: Partial<ITransform2D> = {};
+    for (const key of keys) {
+      const plan = dragState.mutationPlan.get(key) ?? { kind: "static" as const };
+      finalTransform[key] = readLiveValue(kernel, plan, dragState.tick, layer.transform, key);
+      restoreLivePreview(kernel, plan, dragState.tick);
+    }
     layer.transform = dragState.startTransform;
 
     kernel.inspectorEditor.setLayerTransform({
       type: "SetLayerTransform",
       payload: {
         layerId: dragState.layerId,
-        transform:
-          dragState.mode === "move"
-            ? { x: finalTransform.x, y: finalTransform.y }
-            : {
-                x: finalTransform.x,
-                y: finalTransform.y,
-                scaleX: finalTransform.scaleX,
-                scaleY: finalTransform.scaleY,
-              },
-        tick: kernel.playback.currentTick,
+        transform: finalTransform,
+        tick: dragState.tick,
       },
     });
 
@@ -389,6 +522,7 @@ export function CanvasPanel(): JSX.Element {
         const fixedCorner = worldCorners[3 - cornerIndex];
         const fixedCornerLocal = boxCorners(selectedLayer.bounds)[3 - cornerIndex];
         if (draggedCorner && fixedCorner && fixedCornerLocal) {
+          const tick = kernel.playback.currentTick;
           dragStateRef.current = {
             mode: "scale",
             layerId: selectedLayer.layerId,
@@ -396,6 +530,13 @@ export function CanvasPanel(): JSX.Element {
             fixedCornerWorld: fixedCorner,
             fixedCornerLocal,
             draggedCornerWorldStart: draggedCorner,
+            tick,
+            mutationPlan: planKeyMutations(
+              kernel,
+              selectedLayer.layerId,
+              ["x", "y", "scaleX", "scaleY"],
+              tick,
+            ),
           };
           return;
         }
@@ -415,11 +556,14 @@ export function CanvasPanel(): JSX.Element {
       });
 
     if (hit && selection.layerIds.includes(hit.layerId)) {
+      const tick = kernel.playback.currentTick;
       dragStateRef.current = {
         mode: "move",
         layerId: hit.layerId,
         startTransform: { ...hit.transform },
         startPointerCanvas: point,
+        tick,
+        mutationPlan: planKeyMutations(kernel, hit.layerId, ["x", "y"], tick),
       };
     }
 

@@ -26,3 +26,4 @@
 - [Commit cadence](feedback_commit_cadence.md) — Commit after every message with file changes, don't batch into one final commit
 - [Dev server cadence](feedback_dev_server_cadence.md) — Always run apps/studio dev server on port 3000, restart it after every commit
 - [Canvas texture pipeline](project_canvas_texture_pipeline.md) — Real image/video rendering across all 4 backends (canvas-ui-refactoring branch), ITextureSource/Provider shapes, WebGPU multi-node uniform-buffer risk found but not fixed
+- [Keyframe write scope](feedback_keyframe_write_scope.md) — Don't make keyframe writes manual-only across the board; canvas drag needs auto-create/update to stay visible, only Inspector typing benefits from debounce/manual
