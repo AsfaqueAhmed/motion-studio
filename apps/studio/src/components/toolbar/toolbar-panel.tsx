@@ -3,14 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
+  ChevronLeft,
   Cloud,
   FolderClosed,
   MoreHorizontal,
+  RectangleHorizontal,
+  RectangleVertical,
   Redo2,
   ShieldCheck,
+  SlidersHorizontal,
+  Square,
   Undo2,
   Upload,
   UserCircle2,
+  type LucideIcon,
 } from "lucide-react";
 import { useEngineRevisionStore } from "../../state/use-engine-revision-store";
 import { useCanvasStore } from "../../state/use-canvas-store";
@@ -18,17 +24,37 @@ import { useProjectStore } from "../../state/use-project-store";
 import { useEditorKernel } from "../editor-kernel-provider";
 import type { EditorKernel } from "../../editor-kernel/editor-kernel";
 
+interface IFramePreset {
+  readonly label: string;
+  readonly width: number;
+  readonly height: number;
+  readonly icon: LucideIcon;
+}
+
+const FRAME_PRESETS: readonly IFramePreset[] = [
+  { label: "Landscape", width: 1920, height: 1080, icon: RectangleHorizontal },
+  { label: "Portrait", width: 1080, height: 1920, icon: RectangleVertical },
+  { label: "Square", width: 1080, height: 1080, icon: Square },
+];
+
+function matchingPreset(width: number, height: number): IFramePreset | undefined {
+  return FRAME_PRESETS.find((preset) => preset.width === width && preset.height === height);
+}
+
 /**
  * Output frame size (`IComposition.width`/`height`) editor — a small
- * popover so it doesn't need a dedicated dialog for two number fields.
- * Commits on blur/Enter rather than per-keystroke `onChange`, unlike the
- * Inspector's property editors: typing "1080" digit-by-digit would
- * otherwise push four separate undo steps and briefly render at each
- * invalid intermediate size (e.g. width=1).
+ * popover listing common presets (Landscape/Portrait/Square) plus a Custom
+ * sub-view with raw width/height fields. Custom commits on blur/Enter
+ * rather than per-keystroke `onChange`, unlike the Inspector's property
+ * editors: typing "1080" digit-by-digit would otherwise push four separate
+ * undo steps and briefly render at each invalid intermediate size (e.g.
+ * width=1). Picking a preset commits immediately — there's no intermediate
+ * state to protect against there.
  */
 function FrameSizeControl({ kernel }: { kernel: EditorKernel }): JSX.Element {
   const composition = kernel.timelineEngine.requireComposition(kernel.defaultCompositionId);
   const [isOpen, setIsOpen] = useState(false);
+  const [showCustom, setShowCustom] = useState(false);
   const [width, setWidth] = useState(String(composition.width));
   const [height, setHeight] = useState(String(composition.height));
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,6 +65,7 @@ function FrameSizeControl({ kernel }: { kernel: EditorKernel }): JSX.Element {
     }
     setWidth(String(composition.width));
     setHeight(String(composition.height));
+    setShowCustom(!matchingPreset(composition.width, composition.height));
     const handleOutsideClick = (event: MouseEvent): void => {
       if (!containerRef.current?.contains(event.target as Node)) {
         setIsOpen(false);
@@ -48,7 +75,15 @@ function FrameSizeControl({ kernel }: { kernel: EditorKernel }): JSX.Element {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isOpen, composition.width, composition.height]);
 
-  const commit = (): void => {
+  const applyPreset = (preset: IFramePreset): void => {
+    kernel.timelineEditor.setCompositionSize({
+      type: "SetCompositionSize",
+      payload: { compositionId: composition.id, width: preset.width, height: preset.height },
+    });
+    setIsOpen(false);
+  };
+
+  const commitCustom = (): void => {
     const nextWidth = Math.round(Number(width));
     const nextHeight = Math.round(Number(height));
     if (
@@ -68,6 +103,8 @@ function FrameSizeControl({ kernel }: { kernel: EditorKernel }): JSX.Element {
     }
   };
 
+  const active = matchingPreset(composition.width, composition.height);
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -82,34 +119,82 @@ function FrameSizeControl({ kernel }: { kernel: EditorKernel }): JSX.Element {
         <ChevronDown className="h-3.5 w-3.5 text-editor-text-muted" aria-hidden />
       </button>
       {isOpen && (
-        <div className="absolute left-0 top-full z-30 mt-1 flex items-center gap-2 rounded-lg border border-editor-border bg-editor-surface p-2 shadow-2xl shadow-black/50">
-          <input
-            type="number"
-            min={1}
-            value={width}
-            onChange={(event) => setWidth(event.target.value)}
-            onBlur={commit}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
-            className="w-16 rounded border border-editor-border bg-editor-bg px-1 py-0.5 text-editor-text"
-          />
-          <span className="text-editor-text-muted">×</span>
-          <input
-            type="number"
-            min={1}
-            value={height}
-            onChange={(event) => setHeight(event.target.value)}
-            onBlur={commit}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.currentTarget.blur();
-              }
-            }}
-            className="w-16 rounded border border-editor-border bg-editor-bg px-1 py-0.5 text-editor-text"
-          />
+        <div className="absolute left-0 top-full z-30 mt-1 w-44 rounded-lg border border-editor-border bg-editor-surface p-1 shadow-2xl shadow-black/50">
+          {!showCustom ? (
+            <div className="flex flex-col gap-0.5">
+              {FRAME_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => applyPreset(preset)}
+                  className={`flex items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-editor-surface-raised ${
+                    active?.label === preset.label ? "text-editor-accent" : ""
+                  }`}
+                >
+                  <preset.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="flex-1">{preset.label}</span>
+                  <span className="text-editor-text-muted">
+                    {preset.width}×{preset.height}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setShowCustom(true)}
+                className={`flex items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-editor-surface-raised ${
+                  !active ? "text-editor-accent" : ""
+                }`}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="flex-1">Custom</span>
+                {!active && (
+                  <span className="text-editor-text-muted">
+                    {composition.width}×{composition.height}
+                  </span>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 p-1">
+              <button
+                type="button"
+                onClick={() => setShowCustom(false)}
+                className="flex items-center gap-1 text-editor-text-muted hover:text-editor-text"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+                Custom
+              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  value={width}
+                  onChange={(event) => setWidth(event.target.value)}
+                  onBlur={commitCustom}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  className="w-16 rounded border border-editor-border bg-editor-bg px-1 py-0.5 text-editor-text"
+                />
+                <span className="text-editor-text-muted">×</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={height}
+                  onChange={(event) => setHeight(event.target.value)}
+                  onBlur={commitCustom}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.currentTarget.blur();
+                    }
+                  }}
+                  className="w-16 rounded border border-editor-border bg-editor-bg px-1 py-0.5 text-editor-text"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
