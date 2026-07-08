@@ -122,3 +122,4 @@
 {"type":"last-prompt","lastPrompt":"are you available?","leafUuid":"f9bc18cb-05da-49b4-9d74-844164c4a5a1","sessionId":"e7bafd58-bb37-4aac-b326-e4caa0d6912e"}
 {"type":"ai-title","aiTitle":"Export Claude conversations to git","sessionId":"e7bafd58-bb37-4aac-b326-e4caa0d6912e"}
 {"type":"mode","mode":"normal","sessionId":"e7bafd58-bb37-4aac-b326-e4caa0d6912e"}
+{"type":"last-prompt","lastPrompt":"is there a way to upload claude conversation too in the git so i can use them or start from where i left in my home pc?","leafUuid":"b121281e-f5d0-42ea-b6d2-47f688f23025","sessionId":"e7bafd58-bb37-4aac-b326-e4caa0d6912e"}

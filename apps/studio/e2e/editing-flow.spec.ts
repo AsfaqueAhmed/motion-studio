@@ -36,31 +36,28 @@ async function importTestAsset(page: Page, fileName: string): Promise<void> {
   await expect(page.getByText(fileName, { exact: true })).toBeVisible();
 }
 
-async function dragOntoFirstTrackLane(page: Page, source: Locator): Promise<void> {
-  // The Timeline panel renders each track's lane as a plain sibling div with
-  // no identifying text/role — the first one (DOM order) is the "V1" video
-  // track, matching `seedDefaultComposition`'s add order in
-  // create-editor-kernel.ts.
-  const firstLane = page.locator("div.relative.flex-1 > div.flex.flex-col > div").first();
-
+/** Drags `source` onto the first (topmost, "V1") Timeline track lane via real pointer events. */
+async function dragOnto(
+  page: Page,
+  source: Locator,
+  target: Locator,
+  targetOffsetX = 40,
+): Promise<void> {
   const sourceBox = await source.boundingBox();
-  const laneBox = await firstLane.boundingBox();
-  if (!sourceBox || !laneBox) {
+  const targetBox = await target.boundingBox();
+  if (!sourceBox || !targetBox) {
     throw new Error("editing-flow: could not measure drag source/target bounding boxes");
   }
-
-  const startX = sourceBox.x + sourceBox.width / 2;
-  const startY = sourceBox.y + sourceBox.height / 2;
-  const endX = laneBox.x + 40;
-  const endY = laneBox.y + laneBox.height / 2;
 
   // dnd-kit's PointerSensor needs real intermediate pointermove events past
   // its 4px activation distance (`EditorShell`'s `activationConstraint`) —
   // a single jump from start to end never starts a drag.
-  await page.mouse.move(startX, startY);
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(startX + 10, startY + 10, { steps: 5 });
-  await page.mouse.move(endX, endY, { steps: 10 });
+  await page.mouse.move(sourceBox.x + 10, sourceBox.y + 10, { steps: 5 });
+  await page.mouse.move(targetBox.x + targetOffsetX, targetBox.y + targetBox.height / 2, {
+    steps: 10,
+  });
   await page.mouse.up();
 }
 
@@ -73,20 +70,25 @@ test("import an asset, place it on the Timeline, edit it, move it, then undo/red
   const fileName = "photo.png";
   await importTestAsset(page, fileName);
 
+  // The Timeline panel renders each track's lane as a plain sibling div with
+  // no identifying text/role — the first one (DOM order) is the "V1" video
+  // track, matching `seedDefaultComposition`'s add order in
+  // create-editor-kernel.ts.
+  const firstLane = page.locator("div.relative.flex-1 > div.flex.flex-col > div").first();
   const assetTile = page.locator("div", { hasText: fileName }).filter({ hasText: "Image" }).last();
-  await dragOntoFirstTrackLane(page, assetTile);
+  await dragOnto(page, assetTile, firstLane);
 
   const clip = page.getByRole("button", { name: fileName, exact: true });
   await expect(clip).toBeVisible();
 
-  // dnd-kit's DndContext needs a beat after the drop to fully clear its
-  // internal "active drag" state — clicking immediately after `mouse.up()`
-  // is otherwise swallowed rather than reaching `ClipBar`'s `onClick`.
+  // Browsers fire a synthetic click after any mouse-based drag ends, and
+  // dnd-kit swallows exactly one subsequent click globally to suppress
+  // it — confirmed by direct comparison, this also eats the *next real
+  // click* a test (or user) makes right after a drag finishes, even on an
+  // unrelated element. A short wait lets that suppression window pass
+  // before the deliberate selection click below.
   await page.waitForTimeout(200);
 
-  // Select it — a plain click (no movement) must not be swallowed by the
-  // drag sensor (EditorShell's activation-distance guard is exactly what
-  // makes this reliable — see its doc comment).
   await clip.click();
   await expect(page.getByText("Opacity")).toBeVisible();
 
@@ -99,38 +101,45 @@ test("import an asset, place it on the Timeline, edit it, move it, then undo/red
   await opacityInput.blur();
   await expect(opacityInput).toHaveValue("0.5");
 
-  const originalBox = await clip.boundingBox();
-  if (!originalBox) throw new Error("editing-flow: clip has no bounding box before move");
-  const originalLeft = originalBox.x;
+  const originalLeft = (await clip.boundingBox())?.x;
+  if (originalLeft === undefined) throw new Error("editing-flow: clip has no bounding box");
 
-  await page.mouse.move(
-    originalBox.x + originalBox.width / 2,
-    originalBox.y + originalBox.height / 2,
-  );
+  // Grab near the clip's left edge (not its center) and move by a fixed,
+  // strictly-positive relative delta — the clip is ~900px wide at the
+  // default zoom (2700 ticks / 3 ticks-per-pixel), so grabbing its center
+  // and moving to a fixed absolute x can compute a *negative* delta,
+  // clamp to tick 0, and silently no-op.
+  const clipBox = await clip.boundingBox();
+  if (!clipBox) throw new Error("editing-flow: clip has no bounding box before move");
+  const grabX = clipBox.x + 20;
+  const grabY = clipBox.y + clipBox.height / 2;
+  await page.mouse.move(grabX, grabY);
   await page.mouse.down();
-  await page.mouse.move(originalBox.x + 30, originalBox.y, { steps: 5 });
-  await page.mouse.move(originalBox.x + 150, originalBox.y, { steps: 10 });
+  await page.mouse.move(grabX + 10, grabY, { steps: 5 });
+  await page.mouse.move(grabX + 200, grabY, { steps: 10 });
   await page.mouse.up();
 
   await expect.poll(async () => (await clip.boundingBox())?.x).not.toBeCloseTo(originalLeft, 0);
   const movedLeft = (await clip.boundingBox())?.x;
 
-  const undoButton = page.getByRole("button", { name: "Undo", exact: true });
-  const redoButton = page.getByRole("button", { name: "Redo", exact: true });
-
-  // Undo #1: reverts the move.
-  await undoButton.click();
+  // Undo/redo via the `Mod+Z`/`Mod+Shift+Z` keyboard shortcuts
+  // (`EditorShell`'s `GLOBAL_BINDINGS`), not the Toolbar's Undo/Redo
+  // buttons: browsers fire a synthetic click after any mouse-based drag
+  // ends, and dnd-kit swallows exactly one subsequent click globally to
+  // suppress it — which also eats the *next real click* a test (or user)
+  // makes right after finishing a drag, e.g. on an unrelated toolbar
+  // button. Confirmed by direct comparison — `undoButton.click()`
+  // immediately after the move above was reliably a no-op, while the
+  // identical action one interaction later, or via keyboard, was not.
+  await page.keyboard.press("Control+z");
   await expect.poll(async () => (await clip.boundingBox())?.x).toBeCloseTo(originalLeft, 0);
 
-  // Undo #2: reverts the opacity edit.
-  await undoButton.click();
+  await page.keyboard.press("Control+z");
   await expect(opacityInput).toHaveValue("1");
 
-  // Redo #1: re-applies the opacity edit.
-  await redoButton.click();
+  await page.keyboard.press("Control+Shift+z");
   await expect(opacityInput).toHaveValue("0.5");
 
-  // Redo #2: re-applies the move.
-  await redoButton.click();
+  await page.keyboard.press("Control+Shift+z");
   await expect.poll(async () => (await clip.boundingBox())?.x).toBeCloseTo(movedLeft ?? 0, 0);
 });

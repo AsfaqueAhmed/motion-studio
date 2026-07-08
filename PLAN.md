@@ -494,28 +494,28 @@ canvas pixels.
 
 ---
 
-## Phase 16 — Testing
+## Phase 16 — Testing ✅ complete (2026-07-07), 16.3 partially complete — see notes
 
 ### 16.1 Unit tests (Vitest, no browser required)
 
-- [ ] All Commands (execute/undo/redo round-trip)
-- [ ] Tick arithmetic utilities
-- [ ] Frame State evaluation (Timeline + Animation → Frame State)
-- [ ] Discount pricing analogue: Keyframe interpolation (exhaustive easing + bezier tests)
-- [ ] VFS adapter (mock IndexedDB/OPFS)
-- [ ] Asset dedup by content hash
+- [x] All Commands (execute/undo/redo round-trip) — `packages/timeline`/`packages/animation`/`packages/history` Commands already had full round-trip tests from earlier phases; the real gap was all 6 `apps/studio/src/editor-kernel/commands/*.ts` Commands added in Phase 15 (`AddLayerCommand`, `AddTrackItemCommand`, `AddAnimationClipCommand`, `AddPropertyTrackCommand`, `UpdateLayerCommand`, `RegisterAssetReferenceCommand`), which had zero tests — all 6 now do; also added the missing `redo()` assertion to `SplitTrackItemCommand`/`RippleDeleteCommand`'s existing tests
+- [x] Tick arithmetic utilities — `packages/shared/src/tick.ts` had no test file at all; `tick.test.ts` added (rounding, the `1s @ 30fps = 900 ticks` GLOSSARY.md example, fps/resolution/seconds round-trip matrix)
+- [x] Frame State evaluation (Timeline + Animation → Frame State) — already covered, `apps/studio/src/editor-kernel/frame-state-builder.test.ts` (Phase 15)
+- [x] Discount pricing analogue: Keyframe interpolation (exhaustive easing + bezier tests) — `easing.test.ts`/`interpolators.test.ts` were already solid; `evaluator.test.ts`'s `evaluateSegment` only ever exercised a Number property before this phase — added Color/Vector2 + Bezier/Step coverage through `evaluateSegment` itself, not just the interpolators in isolation
+- [x] VFS adapter (mock IndexedDB/OPFS) — already covered (`fake-indexeddb` + hand-rolled fake OPFS root); confirmed sufficient for this tier, see 16.2 for the real-browser version
+- [x] Asset dedup by content hash — already covered, `packages/assets/src/import-pipeline.test.ts`
 
 ### 16.2 Integration tests (Vitest + real OPFS in worker)
 
-- [ ] Project save → load → verify round-trip
-- [ ] Asset import → catalog → dedup
-- [ ] Export pipeline (Spike A validated path only)
+- [x] Project save → load → verify round-trip — `packages/storage/src/project-repository.integration.test.ts`, real `StorageEngine`/`indexedDB` (not `fake-indexeddb`); "projects/" routes to IndexedDB, not OPFS
+- [x] Asset import → catalog → dedup — `apps/studio/src/editor-kernel/asset-manager.integration.test.ts` (real OPFS-backed `AssetBlobStore` + real `browserMetadataExtractor`; `AssetCatalogRepository` only exists in `apps/studio`, not the `@motion-studio/assets` package itself, so this is where the real wiring lives) — note: a hand-rolled "minimal" PNG fixture didn't actually decode in Chromium, switched to a real Pillow-generated one
+- [x] Export pipeline (Spike A validated path only) — `packages/export/src/webcodecs-pipeline.integration.test.ts` makes `spikes/spike-a-export/`'s throwaway pipeline permanent: real `mediabunny` (devDependency, pinned to 1.50.6, the version the spike validated) + the spike's own `sample.mp4` fixture (copied to `packages/export/src/test-support/fixtures/`), decode → render → re-encode → mux → parse the output back through Mediabunny itself and assert frame count/dimensions match. `ExportEngine` itself still has no real Mediabunny backend wired (`container.ts` — real feature work, out of scope here). "No worker needed" revision from the plan: `OpfsAdapter` only calls the async main-thread OPFS API, never the worker-only sync access handle, so `@vitest/browser` + Playwright/Chromium on the main thread is sufficient for all three suites above — see `docs/19-testing/integration.md`
 
 ### 16.3 E2E tests (Playwright)
 
-- [ ] Import clip → trim → move → undo → redo → export
-- [ ] Text layer add → edit → style → export
-- [ ] TTS generate → place on timeline → export with audio
+- [ ] Import clip → trim → move → undo → redo → export — **scoped down**: `apps/studio/e2e/editing-flow.spec.ts` covers import → drag onto Timeline → select → edit (Opacity) → move → undo ×2 → redo ×2. Trim and Export are untested — no Trim UI exists anywhere (`TrimTrackItemCommand` is unit-tested but never wired to a Timeline handle), and no Export UI exists (Phase 15 deferred it). Found two real bugs while writing this: `playwright.config.ts` had no `use.baseURL`, so `pnpm test:e2e` — including the pre-existing Phase 15 `smoke.spec.ts` — has always failed on `page.goto("/")` until fixed here; and dnd-kit swallows the click immediately following any drag's drop, globally (not just on the dragged element), which silently no-ops the _next_ click on an unrelated button (e.g. Toolbar Undo) unless you wait or use a keyboard shortcut instead — see `docs/19-testing/e2e.md`
+- [ ] Text layer add → edit → style → export — **fully blocked, not just the export step**: there is no way to create a synthetic (non-asset) Text layer anywhere in the running app — every Layer is asset-driven, and Font assets are explicitly rejected from the Timeline. Needs a Text tool / synthetic-layer creation UI before any part of this flow is drivable
+- [ ] TTS generate → place on timeline → export with audio — **fully blocked**: no AI/TTS panel exists (Phase 15 deferred it, same as Export)
 
 ---
 
