@@ -31,6 +31,11 @@ describe("PropertySchemaRegistry", () => {
     expect(schema.find((row) => row.key === "transform.scaleX")?.editor).toBe("number");
   });
 
+  it("uses the angle editor for rotation, not a raw-radians number field", () => {
+    const schema = new PropertySchemaRegistry(buildRegistry()).getSchema(LayerType.Shape);
+    expect(schema.find((row) => row.key === "transform.rotation")?.editor).toBe("angle");
+  });
+
   it("does not include Shape-only properties for a Text layer", () => {
     const schema = new PropertySchemaRegistry(buildRegistry()).getSchema(LayerType.Text);
     expect(schema.find((row) => row.key === "fillColor")).toBeUndefined();

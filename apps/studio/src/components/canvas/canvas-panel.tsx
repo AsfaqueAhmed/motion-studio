@@ -319,6 +319,15 @@ export function CanvasPanel(): JSX.Element {
               },
       },
     });
+
+    // `setLayerTransform` also bumps the revision store (async, via the
+    // Command Bus's event → React state update), which would eventually
+    // refresh `lastFrameStateRef` too — but not before the very next
+    // gesture's `handlePointerDown` might already need it. A rapid second
+    // drag right after this one otherwise hit-tests against a one-frame-
+    // stale `lastFrameStateRef`, computing its own start transform from
+    // data that doesn't reflect the commit that just happened.
+    renderCurrentFrame();
   };
 
   // Re-subscribes on every dependency change so the tick listener's closure

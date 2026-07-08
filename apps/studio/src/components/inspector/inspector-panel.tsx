@@ -122,6 +122,18 @@ function PropertyEditor({
           className="w-full rounded border border-editor-border bg-editor-bg px-1 py-0.5"
         />
       );
+    case "angle":
+      // Stored/evaluated in radians (every render backend takes
+      // `transform.rotation` as-is), but degrees is what anyone typing a
+      // number into this field actually means.
+      return (
+        <input
+          type="number"
+          value={typeof value === "number" ? (value * 180) / Math.PI : 0}
+          onChange={(event) => onChange((Number(event.target.value) * Math.PI) / 180)}
+          className="w-full rounded border border-editor-border bg-editor-bg px-1 py-0.5"
+        />
+      );
     case "color":
       return (
         <input

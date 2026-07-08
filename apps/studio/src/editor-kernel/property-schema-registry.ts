@@ -1,7 +1,10 @@
 import { PropertyValueType, type LayerType } from "@motion-studio/shared";
 import type { AnimatablePropertyRegistry } from "@motion-studio/animation";
 
-export type PropertyEditorKind = "text" | "number" | "color" | "toggle";
+export type PropertyEditorKind = "text" | "number" | "angle" | "color" | "toggle";
+
+/** Stored/evaluated in radians (every render backend's shader math takes `transform.rotation` as-is) but edited in degrees — the one property this mismatch actually matters for. */
+const ANGLE_KEYS = new Set(["transform.rotation"]);
 
 export interface IPropertySchemaRow {
   readonly key: string;
@@ -77,7 +80,7 @@ export class PropertySchemaRegistry {
       .map((definition): IPropertySchemaRow => ({
         key: definition.propertyKey,
         label: labelFor(definition.propertyKey),
-        editor: editorFor(definition.valueType),
+        editor: ANGLE_KEYS.has(definition.propertyKey) ? "angle" : editorFor(definition.valueType),
         animatable: true,
       }));
     return [...STATIC_ROWS, ...animatableRows];
