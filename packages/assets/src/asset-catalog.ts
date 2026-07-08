@@ -15,6 +15,9 @@ export interface IAssetCatalogEntry {
   readonly sizeBytes: number;
   /** Present for Video/Audio only. */
   readonly durationTicks: Tick | undefined;
+  /** Present for Image/Video only — intrinsic pixel dimensions from import-time metadata extraction. */
+  readonly width: number | undefined;
+  readonly height: number | undefined;
   readonly contentHash: string;
   readonly tags: readonly string[];
   readonly createdAt: number;

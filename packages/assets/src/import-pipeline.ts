@@ -95,6 +95,15 @@ export async function importAsset(
         ? metadata.durationTicks
         : undefined;
 
+    const width =
+      metadata.type === AssetType.Video || metadata.type === AssetType.Image
+        ? metadata.width
+        : undefined;
+    const height =
+      metadata.type === AssetType.Video || metadata.type === AssetType.Image
+        ? metadata.height
+        : undefined;
+
     const entry: IAssetCatalogEntry = {
       id: assetId,
       name: input.fileName,
@@ -102,6 +111,8 @@ export async function importAsset(
       mimeType: input.mimeType,
       sizeBytes: input.data.byteLength,
       durationTicks,
+      width,
+      height,
       contentHash,
       tags: input.tags ? [...input.tags] : [],
       createdAt: Date.now(),

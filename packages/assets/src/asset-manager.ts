@@ -54,6 +54,15 @@ export class AssetManager implements IAssetsEngine {
     return this.options.catalog.list();
   }
 
+  /** Raw content bytes for `assetId`, resolved via the catalog's `contentHash` — same catalog+blobStore composition as `delete()`. */
+  async getBytes(assetId: AssetId): Promise<Uint8Array | undefined> {
+    const entry = await this.options.catalog.get(assetId);
+    if (!entry) {
+      return undefined;
+    }
+    return this.options.blobStore.get(entry.contentHash);
+  }
+
   /** The one representative thumbnail the import pipeline generates, stored at `toTick(0)` (see docs/14-assets/thumbnails.md). */
   getThumbnail(assetId: AssetId, atTick: Tick = toTick(0)): Promise<Uint8Array | undefined> {
     return this.options.thumbnailStore?.get(assetId, atTick) ?? Promise.resolve(undefined);

@@ -11,6 +11,8 @@ function makeEntry(id: string): IAssetCatalogEntry {
     mimeType: "image/png",
     sizeBytes: 1024,
     durationTicks: undefined,
+    width: undefined,
+    height: undefined,
     contentHash: id,
     tags: [],
     createdAt: 0,
