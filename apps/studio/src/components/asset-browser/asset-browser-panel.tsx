@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import type { IAssetCatalogEntry } from "@motion-studio/assets";
 import { AssetType } from "@motion-studio/shared";
 import { useEditorKernel } from "../editor-kernel-provider";
@@ -40,6 +40,67 @@ function useAssetThumbnailUrl(kernel: EditorKernel, entry: IAssetCatalogEntry): 
   }, [kernel, entry.id, entry.type]);
 
   return url;
+}
+
+/**
+ * `AssetManager.delete` rejects if the asset still has TrackItem references
+ * (`packages/assets/src/asset-manager.ts`) — `deleteSelection` never
+ * unregisters those (ADR-010, cascade policy still open), so any asset
+ * that's ever been dragged onto the Timeline hits this path forever, not
+ * just transiently. Confirming and retrying with `force: true` is the
+ * user's explicit per-operation override; the clip itself is left in place
+ * (just loses its source), matching a typical media-bin's behavior.
+ */
+async function handleDeleteAsset(kernel: EditorKernel, entry: IAssetCatalogEntry): Promise<void> {
+  try {
+    await kernel.assetEditor.delete(entry.id);
+    return;
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("still referenced")) {
+      console.error(`AssetBrowserPanel: failed to delete "${entry.name}"`, error);
+      return;
+    }
+  }
+
+  const confirmed = window.confirm(
+    `"${entry.name}" is still used by a clip on the Timeline. Delete it anyway? The clip will stay but lose its source.`,
+  );
+  if (!confirmed) {
+    return;
+  }
+  try {
+    await kernel.assetEditor.delete(entry.id, { force: true });
+  } catch (error) {
+    console.error(`AssetBrowserPanel: failed to force-delete "${entry.name}"`, error);
+  }
+}
+
+function DeleteButton({
+  kernel,
+  entry,
+  className,
+}: {
+  kernel: EditorKernel;
+  entry: IAssetCatalogEntry;
+  className: string;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      title="Delete"
+      // Stops the click/drag-start from reaching the tile's `useDraggable`
+      // listeners on the parent — otherwise this button either starts a
+      // drag instead of clicking, or both fire.
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        void handleDeleteAsset(kernel, entry);
+      }}
+      className={className}
+    >
+      <Trash2 className="h-3 w-3" aria-hidden />
+    </button>
+  );
 }
 
 function AssetTile({
@@ -83,6 +144,11 @@ function AssetTile({
         ) : null}
         <span className="truncate">{entry.name}</span>
         <span className="text-editor-text-muted">{entry.type}</span>
+        <DeleteButton
+          kernel={kernel}
+          entry={entry}
+          className="ml-auto shrink-0 rounded p-1 text-editor-text-muted hover:bg-editor-bg hover:text-red-400"
+        />
       </div>
     );
   }
@@ -98,6 +164,11 @@ function AssetTile({
       {thumbnailUrl ? (
         <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
       ) : null}
+      <DeleteButton
+        kernel={kernel}
+        entry={entry}
+        className="absolute right-1 top-1 rounded bg-black/60 p-1 text-white/80 hover:bg-black/80 hover:text-red-400"
+      />
       <div
         className={
           thumbnailUrl

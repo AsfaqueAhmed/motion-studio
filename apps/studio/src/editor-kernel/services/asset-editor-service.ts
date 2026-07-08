@@ -28,7 +28,7 @@ export class AssetEditorService {
     return this.assetManager.getThumbnail(assetId);
   }
 
-  delete(assetId: AssetId): Promise<void> {
-    return this.assetManager.delete(assetId);
+  delete(assetId: AssetId, options: { force?: boolean } = {}): Promise<void> {
+    return this.assetManager.delete(assetId, options);
   }
 }

@@ -68,6 +68,23 @@ describe("AssetEditorService", () => {
     expect(await service.list()).toEqual([]);
   });
 
+  it("rejects deleting a referenced asset unless force is passed", async () => {
+    const assetManager = fakeAssetManager();
+    const service = new AssetEditorService(assetManager);
+    const entry = await service.import({
+      fileName: "photo.png",
+      mimeType: "image/png",
+      data: new Uint8Array([1, 2, 3]),
+    });
+    assetManager.registerReference(createAssetId(entry.id), "trackitem-1");
+
+    await expect(service.delete(createAssetId(entry.id))).rejects.toThrow(/still referenced/);
+    expect(await service.list()).toEqual([entry]);
+
+    await service.delete(createAssetId(entry.id), { force: true });
+    expect(await service.list()).toEqual([]);
+  });
+
   it("returns the thumbnail generated at import", async () => {
     const service = new AssetEditorService(fakeAssetManager());
     const entry = await service.import({
