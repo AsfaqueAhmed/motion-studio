@@ -78,4 +78,25 @@ describe("Canvas2DRenderBackend", () => {
     backend.dispose();
     expect(() => backend.drawFrame(sceneGraph([]))).toThrow(/init/);
   });
+
+  it("draws a resolved image-source texture via drawImage instead of the placeholder fillRect", () => {
+    const ctx = new FakeCanvas2DContext();
+    const backend = new Canvas2DRenderBackend({ getContext: () => ctx });
+    backend.init({ width: 100, height: 100 });
+    const fakeImage = {} as CanvasImageSource;
+    backend.drawFrame(
+      sceneGraph([
+        node({
+          layerId: "a",
+          texture: { kind: "image-source", source: fakeImage, width: 10, height: 10 },
+        }),
+      ]),
+    );
+
+    expect(ctx.calls.some((c) => c.op === "fillRect")).toBe(false);
+    const drawImageCalls = ctx.calls.filter((c) => c.op === "drawImage");
+    expect(drawImageCalls).toEqual([
+      { op: "drawImage", image: fakeImage, x: 0, y: 0, width: 10, height: 10 },
+    ]);
+  });
 });

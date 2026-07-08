@@ -19,6 +19,7 @@ export interface ICanvas2DContext {
   scale(x: number, y: number): void;
   clearRect(x: number, y: number, width: number, height: number): void;
   fillRect(x: number, y: number, width: number, height: number): void;
+  drawImage(image: CanvasImageSource, dx: number, dy: number, dw: number, dh: number): void;
   globalAlpha: number;
   fillStyle: string;
 }
@@ -65,21 +66,23 @@ export class Canvas2DRenderBackend implements IRenderBackend {
   }
 
   private drawNode(ctx: ICanvas2DContext, node: ISceneGraphNode): void {
-    const { r, g, b } = placeholderColor(node.layerId);
-    const { transform, bounds } = node;
+    const { transform, bounds, texture } = node;
+    const dx = bounds.x - transform.anchorX;
+    const dy = bounds.y - transform.anchorY;
 
     ctx.save();
     ctx.translate(transform.x, transform.y);
     ctx.rotate(transform.rotation);
     ctx.scale(transform.scaleX, transform.scaleY);
     ctx.globalAlpha = node.opacity;
-    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-    ctx.fillRect(
-      bounds.x - transform.anchorX,
-      bounds.y - transform.anchorY,
-      bounds.width,
-      bounds.height,
-    );
+
+    if (texture?.kind === "image-source") {
+      ctx.drawImage(texture.source, dx, dy, bounds.width, bounds.height);
+    } else {
+      const { r, g, b } = placeholderColor(node.layerId);
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      ctx.fillRect(dx, dy, bounds.width, bounds.height);
+    }
     ctx.restore();
   }
 

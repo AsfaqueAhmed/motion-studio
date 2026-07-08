@@ -5,7 +5,15 @@ export type FakeCanvas2DCall =
   | { op: "translate"; x: number; y: number }
   | { op: "rotate"; radians: number }
   | { op: "scale"; x: number; y: number }
-  | { op: "clearRect" | "fillRect"; x: number; y: number; width: number; height: number };
+  | { op: "clearRect" | "fillRect"; x: number; y: number; width: number; height: number }
+  | {
+      op: "drawImage";
+      image: CanvasImageSource;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
 
 /** Records every call instead of touching a real `<canvas>` — see canvas2d-backend.ts docstring. */
 export class FakeCanvas2DContext implements ICanvas2DContext {
@@ -39,5 +47,9 @@ export class FakeCanvas2DContext implements ICanvas2DContext {
 
   fillRect(x: number, y: number, width: number, height: number): void {
     this.calls.push({ op: "fillRect", x, y, width, height });
+  }
+
+  drawImage(image: CanvasImageSource, x: number, y: number, width: number, height: number): void {
+    this.calls.push({ op: "drawImage", image, x, y, width, height });
   }
 }
