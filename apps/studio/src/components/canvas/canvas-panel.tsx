@@ -108,6 +108,21 @@ export function CanvasPanel(): JSX.Element {
     return kernel.playback.onTick(() => renderCurrentFrame());
   }, [kernel, revision, selection, showOverlays]);
 
+  // The backend caches width/height inside init() (WebGPU bakes it into the
+  // NDC-conversion uniform, Canvas2D uses it for clearRect) — the mount
+  // effect above only calls it once, so a later frame size change (the
+  // Toolbar's FrameSizeControl) needs its own re-init or the backend keeps
+  // drawing at the old size onto a canvas element React has already resized.
+  useEffect(() => {
+    const engine = renderingEngineRef.current;
+    if (!engine) {
+      return;
+    }
+    void engine
+      .setTarget({ width: composition.width, height: composition.height })
+      .then(() => renderCurrentFrame());
+  }, [composition.width, composition.height]);
+
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>): void => {
     const frameState = lastFrameStateRef.current;
     const canvas = overlayRef.current;
