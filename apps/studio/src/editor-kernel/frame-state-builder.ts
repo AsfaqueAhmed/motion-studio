@@ -1,5 +1,6 @@
 import {
   toTick,
+  type AssetId,
   type CompositionId,
   type IBounds,
   type IFrameState,
@@ -13,13 +14,12 @@ import type { TimelineEngine } from "@motion-studio/timeline";
 import { getLayerPropertyValue } from "./layer-property-path";
 
 /**
- * Every Layer's intrinsic local-space size (before `transform` is applied)
- * isn't modeled on `ILayer` anywhere yet — width/height for a decoded
- * image/video lives on the Asset Catalog entry (async lookup), and shapes
- * carry no width/height field at all (only `cornerRadius`/fill/stroke).
- * Flagged as an open item rather than silently invented per-type sizing;
- * every layer gets the same placeholder box, which `transform.scaleX/Y`
- * still stretches meaningfully.
+ * Fallback for a layer whose intrinsic size isn't resolved yet — either it
+ * has no backing asset (Text/Shape/Group: no `assetId`, no engine models
+ * their intrinsic size yet, a separate open item) or its asset's real
+ * dimensions haven't finished resolving (`dimensionsLookup` miss on the
+ * first render after the layer appears). `transform.scaleX/Y` still
+ * stretches this meaningfully either way.
  */
 const PLACEHOLDER_BOUNDS: IBounds = { x: 0, y: 0, width: 200, height: 200 };
 
@@ -31,7 +31,9 @@ const TRANSFORM_KEYS = ["x", "y", "scaleX", "scaleY", "rotation"] as const;
  * pieces (`getTrackItemsSorted`, `evaluateAt`, `registry.get`), never the
  * evaluation itself, since "which tick, which composition" is an Editor
  * Service/Canvas-panel concern, not something any single engine owns.
- * Synchronous and side-effect-free so it can run once per rendered frame.
+ * Synchronous and side-effect-free so it can run once per rendered frame —
+ * `dimensionsLookup` must be a synchronous cache read too (see
+ * `TextureSourceResolver.getDimensions`), never an async asset lookup.
  */
 export function buildFrameState(
   tick: Tick,
@@ -39,6 +41,7 @@ export function buildFrameState(
   timelineEngine: TimelineEngine,
   layerEngine: LayerEngine,
   animationEngine: AnimationEngine,
+  dimensionsLookup?: (assetId: AssetId) => IBounds | undefined,
 ): IFrameState {
   const composition = timelineEngine.requireComposition(compositionId);
   const layers: IFrameStateLayer[] = [];
@@ -81,14 +84,18 @@ export function buildFrameState(
             : getLayerPropertyValue(layer, definition.propertyKey);
       }
 
+      const assetId = "assetId" in layer ? layer.assetId : undefined;
+      const bounds =
+        (assetId !== undefined ? dimensionsLookup?.(assetId) : undefined) ?? PLACEHOLDER_BOUNDS;
+
       layers.push({
         layerId: layer.id,
         type: layer.type,
         transform,
         opacity,
         zIndex: trackIndex,
-        bounds: PLACEHOLDER_BOUNDS,
-        assetId: "assetId" in layer ? layer.assetId : undefined,
+        bounds,
+        assetId,
         properties,
       });
     }

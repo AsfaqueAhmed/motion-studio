@@ -2,23 +2,25 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { RenderingEngine, worldBounds, type IRenderBackend } from "@motion-studio/rendering";
-import type { IFrameState } from "@motion-studio/shared";
+import { PlaybackState, ticksToSeconds, type IFrameState } from "@motion-studio/shared";
 import { useEditorKernel } from "../editor-kernel-provider";
 import { useCanvasStore } from "../../state/use-canvas-store";
 import { useTimelineStore } from "../../state/use-timeline-store";
 import { useEngineRevisionStore } from "../../state/use-engine-revision-store";
 import { createRenderBackend } from "../../editor-kernel/render-backend-factory";
 import { buildFrameState } from "../../editor-kernel/frame-state-builder";
+import { TextureSourceResolver } from "../../editor-kernel/texture-source-resolver";
 
 /**
  * Hosts the real `RenderingEngine`/`IRenderBackend` pipeline
  * (`ARCHITECTURE.md` §4 Frame State → pixels) against an actual
  * `<canvas>`. `RenderingEngine`'s lifecycle is owned here, not by
  * `AppEngine` — it needs the real canvas element, which only exists once
- * this component mounts (see `EditorKernel`'s doc comment). Content is
- * placeholder colored rects (`placeholder-color.ts`) regardless of which
- * backend wins the fallback chain — no decoder pipeline exists anywhere in
- * the project yet.
+ * this component mounts (see `EditorKernel`'s doc comment). Image/Video
+ * layers draw real decoded content via `TextureSourceResolver` (also owned
+ * here, same DOM-lifecycle reasoning); every other layer type still draws a
+ * placeholder colored rect (`placeholder-color.ts`) until Text/Shape/Group
+ * layers get an intrinsic-size model of their own.
  */
 export function CanvasPanel(): JSX.Element {
   const kernel = useEditorKernel();
@@ -27,6 +29,7 @@ export function CanvasPanel(): JSX.Element {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const renderingEngineRef = useRef<RenderingEngine | null>(null);
   const backendRef = useRef<IRenderBackend | null>(null);
+  const textureResolverRef = useRef<TextureSourceResolver | null>(null);
   const lastFrameStateRef = useRef<IFrameState | null>(null);
   const revision = useEngineRevisionStore((state) => state.revision);
   const selection = useTimelineStore((state) => state.selection);
@@ -75,12 +78,18 @@ export function CanvasPanel(): JSX.Element {
     if (!engine) {
       return;
     }
+    const textureResolver = textureResolverRef.current;
+    textureResolver?.syncVideos(
+      kernel.playback.playbackState === PlaybackState.Playing,
+      ticksToSeconds(kernel.playback.currentTick, composition.fps),
+    );
     const frameState = buildFrameState(
       kernel.playback.currentTick,
       kernel.defaultCompositionId,
       kernel.timelineEngine,
       kernel.layerEngine,
       kernel.animationEngine,
+      (assetId) => textureResolver?.getDimensions(assetId),
     );
     lastFrameStateRef.current = frameState;
     void engine.renderFrame(frameState);
@@ -110,6 +119,8 @@ export function CanvasPanel(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
+    const textureResolver = new TextureSourceResolver(kernel.assetManager);
+    textureResolverRef.current = textureResolver;
 
     createRenderBackend(canvasRef.current!)
       .then(async (backend) => {
@@ -118,7 +129,7 @@ export function CanvasPanel(): JSX.Element {
           return;
         }
         backendRef.current = backend;
-        const engine = new RenderingEngine(backend);
+        const engine = new RenderingEngine(backend, textureResolver);
         await engine.setTarget({ width: composition.width, height: composition.height });
         renderingEngineRef.current = engine;
         renderCurrentFrame();
@@ -132,6 +143,8 @@ export function CanvasPanel(): JSX.Element {
       void renderingEngineRef.current?.dispose();
       renderingEngineRef.current = null;
       backendRef.current = null;
+      textureResolver.dispose();
+      textureResolverRef.current = null;
     };
   }, [kernel]);
 

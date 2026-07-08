@@ -134,4 +134,31 @@ describe("buildFrameState", () => {
     );
     expect(frameState.layers).toHaveLength(0);
   });
+
+  it("populates assetId for an asset-backed layer and falls back to placeholder bounds without a dimensionsLookup", () => {
+    const frameState = buildFrameState(
+      toTick(150),
+      compositionId,
+      timelineEngine,
+      layerEngine,
+      animationEngine,
+    );
+    expect(frameState.layers[0]?.assetId).toBe(createAssetId("asset-1"));
+    expect(frameState.layers[0]?.bounds).toEqual({ x: 0, y: 0, width: 200, height: 200 });
+  });
+
+  it("uses dimensionsLookup's bounds for an asset-backed layer when it resolves", () => {
+    const frameState = buildFrameState(
+      toTick(150),
+      compositionId,
+      timelineEngine,
+      layerEngine,
+      animationEngine,
+      (assetId) =>
+        assetId === createAssetId("asset-1")
+          ? { x: 0, y: 0, width: 1920, height: 1080 }
+          : undefined,
+    );
+    expect(frameState.layers[0]?.bounds).toEqual({ x: 0, y: 0, width: 1920, height: 1080 });
+  });
 });
