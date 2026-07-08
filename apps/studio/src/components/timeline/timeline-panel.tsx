@@ -137,6 +137,9 @@ function ClipBar({
   trackItemId,
   layerId,
   trackType,
+  startTick,
+  durationTicks,
+  ticksPerPixel,
   left,
   width,
   selected,
@@ -145,6 +148,9 @@ function ClipBar({
   trackItemId: TrackItemId;
   layerId: LayerId;
   trackType: TrackType;
+  startTick: Tick;
+  durationTicks: Tick;
+  ticksPerPixel: number;
   left: number;
   width: number;
   selected: boolean;
@@ -155,11 +161,38 @@ function ClipBar({
   });
   const layer = kernel.layerEngine.registry.get(layerId);
   const select = useTimelineStore((state) => state.select);
+  useEngineRevisionStore((state) => state.revision);
   const Icon = TRACK_ICON[trackType] ?? Film;
+
+  const keyframeTicks = kernel.animationEngine
+    .getKeyframeTicksForLayer(layerId)
+    .filter((tick) => tick >= startTick && tick <= startTick + durationTicks);
+
+  // Only the highlighted-at-playhead styling needs live tick updates —
+  // skip the subscription entirely for the common case (a clip with no
+  // keyframes) so most clips aren't re-rendering on every playback tick.
+  const [currentTick, setCurrentTick] = useState(kernel.playback.currentTick);
+  useEffect(() => {
+    if (keyframeTicks.length === 0) {
+      return;
+    }
+    return kernel.playback.onTick(setCurrentTick);
+  }, [kernel, keyframeTicks.length]);
 
   const handleClick = (event: MouseEvent): void => {
     event.stopPropagation();
     select({ layerIds: layer ? [layer.id] : [], trackItemIds: [trackItemId] });
+  };
+
+  const handleMarkerClick = (event: MouseEvent, tick: Tick): void => {
+    event.stopPropagation();
+    if (!layer) {
+      return;
+    }
+    kernel.inspectorEditor.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId: layer.id, layerType: layer.type, tick },
+    });
   };
 
   return (
@@ -181,6 +214,21 @@ function ClipBar({
     >
       <Icon className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
       {layer?.name ?? "Clip"}
+      {keyframeTicks.map((tick) => (
+        // Diamond markers, not nested `<button>`s — this whole clip is
+        // already a `<button>`, and a `<button>` inside a `<button>` is
+        // invalid HTML with broken click handling.
+        <span
+          key={tick}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => handleMarkerClick(event, tick)}
+          title={tick === currentTick ? "Remove keyframe" : "Keyframe"}
+          className={`absolute top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 cursor-pointer ${
+            tick === currentTick ? "bg-editor-accent" : "bg-white/80"
+          }`}
+          style={{ left: (tick - startTick) / ticksPerPixel - 4 }}
+        />
+      ))}
     </button>
   );
 }
@@ -222,6 +270,9 @@ function TrackLane({
           trackItemId={item.id}
           layerId={item.layerId}
           trackType={trackType}
+          startTick={item.startTick}
+          durationTicks={item.durationTicks}
+          ticksPerPixel={ticksPerPixel}
           left={item.startTick / ticksPerPixel}
           width={item.durationTicks / ticksPerPixel}
           selected={selection.trackItemIds.includes(item.id)}
