@@ -137,4 +137,26 @@ describe("WebGL2RenderBackend", () => {
 
     expect(gl.calls.filter((c) => c.op === "texImage2D")).toHaveLength(3);
   });
+
+  it("re-initializing (a frame-size change) clears the texture cache and re-uploads", () => {
+    const gl = new FakeWebGL2Context();
+    const backend = new WebGL2RenderBackend({ getContext: () => gl });
+    backend.init({ width: 100, height: 100 });
+    const fakeImage = {} as CanvasImageSource;
+    const staticNode = node({
+      layerId: "a",
+      assetId: createAssetId("asset-1"),
+      texture: { kind: "image-source", source: fakeImage, width: 10, height: 10, isLive: false },
+    });
+
+    backend.drawFrame(sceneGraph([staticNode]));
+    expect(gl.calls.filter((c) => c.op === "texImage2D")).toHaveLength(1);
+
+    // Simulates CanvasPanel's resize effect: RenderingEngine.setTarget()
+    // calls init() again on this same backend instance, not a fresh one.
+    backend.init({ width: 200, height: 200 });
+    backend.drawFrame(sceneGraph([staticNode]));
+
+    expect(gl.calls.filter((c) => c.op === "texImage2D")).toHaveLength(2);
+  });
 });

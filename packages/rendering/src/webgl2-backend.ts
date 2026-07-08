@@ -224,6 +224,17 @@ export class WebGL2RenderBackend implements IRenderBackend {
     const gl = this.getContext();
     this.gl = gl;
 
+    // A resize calls init() again on this same instance (see
+    // canvas-panel.tsx's resize effect / webgpu-backend.ts's identical
+    // comment) — texture handles here are program-independent so this
+    // isn't strictly required for correctness the way it is for WebGPU's
+    // pipeline-bound bind groups, but stale handles from a previous init
+    // shouldn't outlive it either.
+    for (const entry of this.textureCache.values()) {
+      gl.deleteTexture(entry.handle);
+    }
+    this.textureCache.clear();
+
     const vertexShader = this.compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
     const fragmentShader = this.compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
     this.program = this.linkProgram(gl, vertexShader, fragmentShader);

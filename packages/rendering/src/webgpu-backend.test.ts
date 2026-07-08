@@ -141,4 +141,27 @@ describe("WebGPURenderBackend", () => {
 
     expect(device.calls.filter((c) => c.op === "copyExternalImageToTexture")).toHaveLength(3);
   });
+
+  it("re-initializing (a frame-size change) clears the texture cache instead of reusing bind groups tied to the old pipeline/buffer", () => {
+    const { backend, device } = makeBackend();
+    backend.init({ width: 100, height: 100 });
+    const fakeImage = {} as CanvasImageSource;
+    const staticNode = node({
+      layerId: "a",
+      assetId: createAssetId("asset-1"),
+      texture: { kind: "image-source", source: fakeImage, width: 10, height: 10, isLive: false },
+    });
+
+    backend.drawFrame(sceneGraph([staticNode]));
+    expect(device.calls.filter((c) => c.op === "copyExternalImageToTexture")).toHaveLength(1);
+
+    // Simulates CanvasPanel's resize effect: RenderingEngine.setTarget()
+    // calls init() again on this same backend instance, not a fresh one.
+    backend.init({ width: 200, height: 200 });
+    backend.drawFrame(sceneGraph([staticNode]));
+
+    // If the stale cache entry (with its uploaded=true flag) survived the
+    // re-init, this second draw would skip re-uploading entirely.
+    expect(device.calls.filter((c) => c.op === "copyExternalImageToTexture")).toHaveLength(2);
+  });
 });

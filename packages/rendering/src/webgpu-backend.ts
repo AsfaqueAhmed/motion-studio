@@ -250,6 +250,16 @@ export class WebGPURenderBackend implements IRenderBackend {
     this.width = target.width;
     this.height = target.height;
 
+    // A resize (frame size change) calls init() again on this same
+    // instance, not a fresh one (RenderingEngine.setTarget just re-inits
+    // the live backend — see canvas-panel.tsx's resize effect). Every
+    // cached bind group was built against *this* pipeline's auto-generated
+    // bind-group layout and *this* uniform buffer; both get replaced below,
+    // orphaning any cached entry — a stale bind group referencing an old
+    // pipeline's layout is not spec-compatible with the new pipeline, so
+    // textured draws using it silently fail (rendered as nothing/black).
+    this.textureCache.clear();
+
     const device = this.dependencies.getDevice();
     const canvasContext = this.dependencies.getCanvasContext();
     const format = this.dependencies.canvasFormat ?? "bgra8unorm";
