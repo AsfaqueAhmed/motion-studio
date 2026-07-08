@@ -59,15 +59,18 @@ export class InspectorEditorService {
   }
 
   /**
-   * Editing never creates a keyframe by itself — the toggle button
-   * (`toggleKeyframe`) is the only sanctioned way to "save" one. If `tick`
-   * already has a keyframe on this property, the edit updates that
-   * keyframe's value (not a new one, just changing what's already there).
-   * Otherwise it writes the plain static field — for an animated property
-   * this is invisible until a keyframe exists at this tick (Frame State
-   * evaluation prefers the keyframed value whenever a track exists), which
-   * is intentional: add a keyframe here first via the toggle button, then
-   * edit it.
+   * A plain static write is invisible for an animated property — Frame
+   * State evaluation (and the Inspector's own `displayValue`) always
+   * prefers the evaluated/keyframed value over the Layer's static field
+   * whenever a track exists. So once a property is animated, an edit has
+   * to land on a keyframe to be visible at all — update the one already at
+   * `tick` if there is one, otherwise add a new one there. This applies to
+   * both a Canvas drag (which only ever calls this once per gesture, on
+   * release — see `canvas-panel.tsx`'s `handlePointerUp`) and an Inspector
+   * field edit (debounced 1s by the caller — see `inspector-panel.tsx`'s
+   * `setProperty` — so rapid typing/dragging a value doesn't spam a
+   * keyframe per intermediate value). Only a property with no track at all
+   * writes straight to the static field.
    */
   private buildWriteCommand(
     layerId: LayerId,
@@ -80,17 +83,25 @@ export class InspectorEditorService {
       .map((id) => this.animationEngine.propertyTracks.get(id))
       .find((existing) => existing?.propertyKey === propertyKey);
 
-    if (track?.keyframes.some((keyframe) => keyframe.tick === tick)) {
+    if (!track) {
+      return new UpdateLayerCommand(
+        crypto.randomUUID(),
+        this.layerEngine,
+        layerId,
+        propertyKey,
+        value,
+      );
+    }
+    if (track.keyframes.some((keyframe) => keyframe.tick === tick)) {
       return new ModifyKeyframeCommand(crypto.randomUUID(), this.animationEngine, track.id, tick, {
         value,
       });
     }
-    return new UpdateLayerCommand(
+    return new AddKeyframeCommand(
       crypto.randomUUID(),
-      this.layerEngine,
-      layerId,
-      propertyKey,
-      value,
+      this.animationEngine,
+      track.id,
+      createKeyframe({ tick, value }),
     );
   }
 
