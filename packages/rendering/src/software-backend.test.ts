@@ -93,4 +93,23 @@ describe("SoftwareRenderBackend", () => {
     backend.drawFrame(sceneGraph([]));
     expect(backend.getFramebuffer()[3]).toBe(0);
   });
+
+  it("samples a raw-rgba texture instead of the placeholder color when present", () => {
+    const backend = new SoftwareRenderBackend();
+    backend.init({ width: 8, height: 8 });
+    // 1x1 solid magenta texture, opaque.
+    const pixels = new Uint8ClampedArray([255, 0, 255, 255]);
+    backend.drawFrame(
+      sceneGraph([
+        node({ layerId: "a", texture: { kind: "raw-rgba", pixels, width: 1, height: 1 } }),
+      ]),
+    );
+
+    const offset = (0 * 8 + 0) * 4;
+    const framebuffer = backend.getFramebuffer();
+    expect(framebuffer[offset]).toBe(255);
+    expect(framebuffer[offset + 1]).toBe(0);
+    expect(framebuffer[offset + 2]).toBe(255);
+    expect(framebuffer[offset + 3]).toBe(255);
+  });
 });
