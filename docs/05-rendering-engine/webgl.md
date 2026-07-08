@@ -28,10 +28,18 @@ Shader compile/link failures throw with the driver's info log
 A second program (`VERTEX_SHADER_SOURCE_TEXTURED`/
 `FRAGMENT_SHADER_SOURCE_TEXTURED`) samples a real `sampler2D` instead of a
 flat `u_color`; its vertex shader derives `v_uv` directly from the unit
-quad (`vec2(a_unitQuad.x, 1.0 - a_unitQuad.y)`, Y-flipped for the top-left
-vs. bottom-left origin mismatch) so no second vertex buffer is needed —
-both programs share the same `layout(location = 0)` attribute binding, set
-up once per frame regardless of which program a given node ends up using.
+quad with **no flip** (`v_uv = a_unitQuad`) — an initial version flipped Y
+here on the (wrong) assumption that WebGL's texture coordinates needed
+correcting against `a_unitQuad`'s top-left-origin convention, but
+`a_unitQuad.y=0` already lands at this quad's top edge (`-ndc.y` in the
+vertex math puts the smallest world-space Y at the top of clip space), and
+`texImage2D` without `UNPACK_FLIP_Y_WEBGL` already stores the source's row
+0 at texture `v=0` — the two "top"s already agree, so the flip was
+introducing an inversion, not fixing one; it showed up as image/video
+content rendering upside down. No second vertex buffer is needed for `v_uv`
+either way — both programs share the same `layout(location = 0)` attribute
+binding, set up once per frame regardless of which program a given node
+ends up using.
 `drawNode` picks flat vs. textured per node based on whether
 `node.texture?.kind === "image-source"`.
 

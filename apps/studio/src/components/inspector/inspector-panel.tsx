@@ -95,6 +95,17 @@ export function InspectorPanel(): JSX.Element {
   );
 }
 
+/**
+ * Display-only rounding — the stored value keeps full precision (contain-fit
+ * centering, e.g. `compositionWidth / 2` or `assetWidth / 2`, genuinely
+ * lands on a fraction for an odd dimension; that's correct math, not a bug),
+ * this just keeps the Inspector's number fields from showing long floating
+ * point noise.
+ */
+function roundForDisplay(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function PropertyEditor({
   row,
   value,
@@ -117,7 +128,7 @@ function PropertyEditor({
       return (
         <input
           type="number"
-          value={typeof value === "number" ? value : 0}
+          value={typeof value === "number" ? roundForDisplay(value) : 0}
           onChange={(event) => onChange(Number(event.target.value))}
           className="w-full rounded border border-editor-border bg-editor-bg px-1 py-0.5"
         />
@@ -129,7 +140,7 @@ function PropertyEditor({
       return (
         <input
           type="number"
-          value={typeof value === "number" ? (value * 180) / Math.PI : 0}
+          value={typeof value === "number" ? roundForDisplay((value * 180) / Math.PI) : 0}
           onChange={(event) => onChange((Number(event.target.value) * Math.PI) / 180)}
           className="w-full rounded border border-editor-border bg-editor-bg px-1 py-0.5"
         />

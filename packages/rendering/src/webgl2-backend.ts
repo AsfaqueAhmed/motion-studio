@@ -147,8 +147,12 @@ void main() {
 /**
  * Textured variant of `VERTEX_SHADER_SOURCE` — identical transform math,
  * plus a `v_uv` varying derived directly from the unit quad (no second
- * vertex buffer needed). Y is flipped because `a_unitQuad`/image pixel data
- * share a top-left origin while GL texture coordinates are bottom-left.
+ * vertex buffer needed, no flip). `texImage2D` without
+ * `UNPACK_FLIP_Y_WEBGL` copies the source's rows in order, so texture row 0
+ * (`v=0`) is already the image's own top row; `a_unitQuad.y=0` is already
+ * this quad's top edge (`VERTEX_SHADER_SOURCE`'s `-ndc.y` puts the smallest
+ * world-space Y at the top of clip space) — the two top edges already
+ * agree, so flipping here would introduce a mismatch, not fix one.
  */
 const VERTEX_SHADER_SOURCE_TEXTURED = `#version 300 es
 layout(location = 0) in vec2 a_unitQuad;
@@ -169,7 +173,7 @@ void main() {
   vec2 world = rotated + u_translate;
   vec2 ndc = (world / u_canvasSize) * 2.0 - 1.0;
   gl_Position = vec4(ndc.x, -ndc.y, 0.0, 1.0);
-  v_uv = vec2(a_unitQuad.x, 1.0 - a_unitQuad.y);
+  v_uv = a_unitQuad;
 }
 `;
 

@@ -172,12 +172,13 @@ fn fs_main() -> @location(0) vec4<f32> {
 
 /**
  * Textured variant — identical transform math to `WGSL_SHADER_SOURCE`, plus
- * a sampler/texture binding and a `uv` varying derived directly from the
- * unit quad (Y-flipped: image/video pixel data is top-left origin, WebGPU
- * texture coordinates are top-left too for `textureSample`, but the quad's
- * own Y already runs top-to-bottom in this system's convention — flipped to
- * match `webgl2-backend.ts`'s identical derivation for consistent output
- * between the two backends).
+ * a sampler/texture binding and a `uv` varying passed straight through from
+ * the unit quad, no flip: `copyExternalImageToTexture` (default `flipY:
+ * false`) preserves source row order, WebGPU's texture coordinate origin is
+ * already top-left (`v=0` = the source's own top row, unlike WebGL's
+ * OpenGL-inherited bottom-left convention), and `unitQuad.y=0` is already
+ * this quad's top edge — same reasoning as `webgl2-backend.ts`'s identical
+ * derivation.
  */
 const TEXTURED_WGSL_SHADER_SOURCE = `
 struct TexturedUniforms {
@@ -209,7 +210,7 @@ fn vs_main(@location(0) unitQuad: vec2<f32>) -> VertexOutput {
   let ndc = (world / u.canvasSize) * 2.0 - vec2<f32>(1.0, 1.0);
   var out: VertexOutput;
   out.position = vec4<f32>(ndc.x, -ndc.y, 0.0, 1.0);
-  out.uv = vec2<f32>(unitQuad.x, 1.0 - unitQuad.y);
+  out.uv = unitQuad;
   return out;
 }
 

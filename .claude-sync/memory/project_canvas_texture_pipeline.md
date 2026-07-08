@@ -78,3 +78,50 @@ accepted-risk posture as the pre-existing unused `TextureCache`).
 **How to apply:** if resuming this work, check `docs/05-rendering-engine/`
 (scene-graph.md, webgpu.md, webgl.md, canvas-fallback.md,
 renderer-overview.md) — all updated with real findings, not stubs anymore.
+
+## Follow-up: auto-fit + drag transform handles + a real stuck-frame bug
+
+Same branch, follow-up work after the texture pipeline landed:
+
+- **Auto-fit on drop**: a freshly dropped layer used to land at
+  `DEFAULT_TRANSFORM` (x=0,y=0,scale=1) while `bounds` now reflects the
+  asset's real pixel size — rendered pinned to the top-left corner at
+  native resolution. Fixed by threading `assetWidth`/`assetHeight` (already
+  synchronously on the Asset Browser's drag payload) through
+  `AddClipFromAssetIntent` so `TimelineEditorService.addClipFromAsset`
+  computes a contain-fit, centered transform (`anchorX/Y` = asset center,
+  `x/y` = composition center) at layer-creation time. Applies to new drops
+  only — not retroactive.
+- **Corner-drag transform handles**: no Interaction Pipeline/Tool system
+  exists (`PLAN.md` §15.6) — implemented directly in `canvas-panel.tsx`'s
+  pointer handlers instead: 4 corner handles for uniform scale (projects
+  pointer movement onto the original corner-to-corner diagonal for the
+  scale factor, solves `translate` from `worldBounds`'s own
+  `world=(local-anchor)*scale+translate` so the opposite corner stays
+  fixed — only exact for `rotation===0`, no rotation handle yet) + drag-body
+  to move. Live-drag mutates the layer in `layerEngine.registry` directly
+  (ephemeral, not a Command) and commits once on pointerup via a new
+  `InspectorEditorService.setLayerTransform` (batches multiple
+  `UpdateLayerCommand`s into one `CompositeCommand` — one undo step, not
+  four).
+- **Real bug found via user report** ("scaling/positioning/rotation all
+  messed up" even on a freshly-dropped layer): `TextureSourceResolver`
+  decodes in the background with **no notification when it finishes**.
+  `CanvasPanel` only re-renders on a Playhead tick or a Command Bus
+  revision bump — a layer dropped while *paused* rendered once against a
+  still-unresolved `getDimensions()` (falling back to `PLACEHOLDER_BOUNDS`)
+  while its transform/anchor were already computed against the *real*
+  dimensions, and then **never repainted again** to self-correct. Fixed by
+  adding an `onResolved` callback to `TextureSourceResolver`'s constructor,
+  invoked once decode settles; `CanvasPanel` passes `renderCurrentFrame`.
+  **Lesson**: any async-resolve-then-cache pattern feeding a manually
+  triggered render loop (not React state) needs an explicit "notify on
+  settle" hook — a cache miss returning `undefined` and silently warming in
+  the background is not enough by itself.
+- Also fixed while investigating: the Inspector's rotation field had zero
+  degrees↔radians conversion (`transform.rotation` is radians everywhere in
+  the render math) — typing "90" applied ~5157° of rotation. Added a
+  dedicated `"angle"` editor kind. And `handlePointerUp` now forces an
+  immediate `renderCurrentFrame()` after committing, since relying solely
+  on the async revision-store round trip left a window where a fast second
+  drag could hit-test against a one-frame-stale `lastFrameStateRef`.
