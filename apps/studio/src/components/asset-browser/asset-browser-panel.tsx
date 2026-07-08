@@ -56,11 +56,11 @@ function AssetTile({
     data: { type: "asset", assetId: entry.id, assetType: entry.type, name: entry.name },
   });
 
-  // The floating `DragOverlay` in `EditorShell` renders the drag preview now,
-  // so the source tile just hides — without this it stayed pinned via CSS
-  // `transform` inside this panel's `overflow-y-auto`, clipping invisible
-  // the moment the pointer left the panel.
-  const style = { opacity: isDragging ? 0 : undefined };
+  // The floating `DragOverlay` in `EditorShell` renders the drag preview
+  // now, so the source tile just dims in place — without this it stayed
+  // pinned via CSS `transform` inside this panel's `overflow-y-auto`,
+  // clipping invisible the moment the pointer left the panel.
+  const style = isDragging ? { opacity: 0.4, filter: "grayscale(0.5) brightness(0.7)" } : undefined;
 
   if (view === "list") {
     return (

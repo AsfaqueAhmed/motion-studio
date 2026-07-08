@@ -10,15 +10,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import {
-  PlaybackState,
-  secondsToTicks,
-  toTick,
-  type AssetId,
-  type AssetType,
-  type TrackId,
-  type TrackItemId,
-} from "@motion-studio/shared";
+import { PlaybackState, secondsToTicks, toTick } from "@motion-studio/shared";
 import { useEditorKernel } from "./editor-kernel-provider";
 import { ToolbarPanel } from "./toolbar/toolbar-panel";
 import { CanvasPanel } from "./canvas/canvas-panel";
@@ -30,14 +22,8 @@ import { LeftPanel } from "./rail/left-panel";
 import { useTimelineStore } from "../state/use-timeline-store";
 import { useCanvasStore } from "../state/use-canvas-store";
 import type { EditorKernel } from "../editor-kernel/editor-kernel";
-
-const DEFAULT_CLIP_DURATION_SECONDS = 3;
-
-type DragData =
-  | { type: "asset"; assetId: AssetId; assetType: AssetType; name: string }
-  | { type: "clip"; trackItemId: TrackItemId };
-
-type DropData = { type: "track"; trackId: TrackId };
+import type { DragData, DropData } from "../lib/dnd-types";
+import { DEFAULT_CLIP_DURATION_SECONDS } from "../lib/timeline-constants";
 
 /**
  * Handles both drop targets a Timeline track accepts: a freshly dragged

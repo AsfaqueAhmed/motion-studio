@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useDraggable, useDndMonitor, useDroppable, type DragMoveEvent } from "@dnd-kit/core";
 import {
   Film,
   Music2,
@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  secondsToTicks,
   ticksPerSecond,
   toTick,
   TrackType,
@@ -36,6 +37,14 @@ import {
 } from "../../state/use-timeline-store";
 import { useEngineRevisionStore } from "../../state/use-engine-revision-store";
 import type { EditorKernel } from "../../editor-kernel/editor-kernel";
+import type { DragData, DropData } from "../../lib/dnd-types";
+import { DEFAULT_CLIP_DURATION_SECONDS } from "../../lib/timeline-constants";
+
+interface DropPreview {
+  trackId: TrackId;
+  left: number;
+  width: number;
+}
 
 /** ticksPerPixel change per unit of wheel `deltaY` — tuned so a mouse notch (~100) and a trackpad tick (~4-10) both feel responsive across the 1-20 zoom range. */
 const ZOOM_WHEEL_SENSITIVITY = 0.02;
@@ -166,7 +175,8 @@ function ClipBar({
       style={{
         left,
         width: Math.max(width, 4),
-        opacity: isDragging ? 0 : undefined,
+        opacity: isDragging ? 0.4 : undefined,
+        filter: isDragging ? "grayscale(0.5) brightness(0.7)" : undefined,
       }}
     >
       <Icon className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
@@ -181,12 +191,14 @@ function TrackLane({
   trackType,
   ticksPerPixel,
   onScrub,
+  preview,
 }: {
   kernel: EditorKernel;
   trackId: TrackId;
   trackType: TrackType;
   ticksPerPixel: number;
   onScrub: (tick: Tick) => void;
+  preview: DropPreview | null;
 }): JSX.Element {
   const { setNodeRef } = useDroppable({ id: `track-${trackId}`, data: { type: "track", trackId } });
   const selection = useTimelineStore((state) => state.selection);
@@ -215,6 +227,12 @@ function TrackLane({
           selected={selection.trackItemIds.includes(item.id)}
         />
       ))}
+      {preview && preview.trackId === trackId ? (
+        <div
+          className="pointer-events-none absolute top-1 h-14 rounded-lg border-2 border-dashed border-editor-accent bg-editor-accent opacity-30"
+          style={{ left: preview.left, width: Math.max(preview.width, 4) }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -264,6 +282,38 @@ function Playhead({
   );
 }
 
+/** Mirrors `EditorShell.handleDragEnd`'s placement math so the preview lands exactly where a drop would. */
+function computeDropPreview(
+  kernel: EditorKernel,
+  event: DragMoveEvent,
+  zoomTicksPerPixel: number,
+): DropPreview | null {
+  const overData = event.over?.data.current as DropData | undefined;
+  const activeData = event.active.data.current as DragData | undefined;
+  if (!overData || overData.type !== "track" || !activeData) {
+    return null;
+  }
+
+  if (activeData.type === "asset") {
+    const activeRect = event.active.rect.current.translated;
+    const overRect = event.over?.rect;
+    const pixelOffset = activeRect && overRect ? Math.max(0, activeRect.left - overRect.left) : 0;
+    const composition = kernel.timelineEngine.requireComposition(kernel.defaultCompositionId);
+    const width =
+      secondsToTicks(DEFAULT_CLIP_DURATION_SECONDS, composition.fps) / zoomTicksPerPixel;
+    return { trackId: overData.trackId, left: pixelOffset, width };
+  }
+
+  const trackItem = kernel.timelineEngine.requireTrackItem(activeData.trackItemId);
+  const deltaTicks = toTick(event.delta.x * zoomTicksPerPixel);
+  const toStartTick = toTick(Math.max(0, trackItem.startTick + deltaTicks));
+  return {
+    trackId: overData.trackId,
+    left: toStartTick / zoomTicksPerPixel,
+    width: trackItem.durationTicks / zoomTicksPerPixel,
+  };
+}
+
 /**
  * Plain full render, no windowing — PLAN.md 15.3 asks for a virtualized
  * track/clip view, but track/item counts in this vertical slice are small
@@ -277,10 +327,17 @@ export function TimelinePanel(): JSX.Element {
   useEngineRevisionStore((state) => state.revision);
   const zoomTicksPerPixel = useTimelineStore((state) => state.zoomTicksPerPixel);
   const [currentTick, setCurrentTick] = useState(kernel.playback.currentTick);
+  const [dropPreview, setDropPreview] = useState<DropPreview | null>(null);
   const trackAreaRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => kernel.playback.onTick(setCurrentTick), [kernel]);
+
+  useDndMonitor({
+    onDragMove: (event) => setDropPreview(computeDropPreview(kernel, event, zoomTicksPerPixel)),
+    onDragEnd: () => setDropPreview(null),
+    onDragCancel: () => setDropPreview(null),
+  });
 
   // Ctrl+wheel (also how browsers report trackpad pinch) zooms, matching every
   // other timeline editor's convention — plain wheel keeps scrolling this
@@ -369,6 +426,7 @@ export function TimelinePanel(): JSX.Element {
                   trackType={track.type}
                   ticksPerPixel={zoomTicksPerPixel}
                   onScrub={(tick) => kernel.playback.seek(tick)}
+                  preview={dropPreview}
                 />
               );
             })}
