@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { RenderingEngine, worldBounds, type IRenderBackend } from "@motion-studio/rendering";
 import type { IFrameState } from "@motion-studio/shared";
 import { useEditorKernel } from "../editor-kernel-provider";
@@ -22,6 +22,7 @@ import { buildFrameState } from "../../editor-kernel/frame-state-builder";
  */
 export function CanvasPanel(): JSX.Element {
   const kernel = useEditorKernel();
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const renderingEngineRef = useRef<RenderingEngine | null>(null);
@@ -31,8 +32,43 @@ export function CanvasPanel(): JSX.Element {
   const selection = useTimelineStore((state) => state.selection);
   const select = useTimelineStore((state) => state.select);
   const showOverlays = useCanvasStore((state) => state.showOverlays);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   const composition = kernel.timelineEngine.requireComposition(kernel.defaultCompositionId);
+
+  // CSS `aspect-ratio` + `max-width/max-height: 100%` can't jointly solve
+  // "fit within this box preserving ratio" the way `object-fit: contain`
+  // does for replaced elements — browsers resolve width first (filling the
+  // available space), derive height from the ratio, then clip it against
+  // max-height without re-deriving width, so a non-square composition (or a
+  // container that isn't already the right ratio) overflows one axis and
+  // gets silently clipped by overflow-hidden instead of shrinking to fit.
+  // Measuring the container and computing the frame's pixel size ourselves
+  // (the same contain-fit math object-fit:contain does internally) is the
+  // only way to actually center a same-ratio box inside it.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+      const { width, height } = entry.contentRect;
+      setContainerSize({ width, height });
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  const scale =
+    containerSize.width > 0 && containerSize.height > 0
+      ? Math.min(containerSize.width / composition.width, containerSize.height / composition.height)
+      : 0;
+  const frameWidth = composition.width * scale;
+  const frameHeight = composition.height * scale;
 
   const renderCurrentFrame = (): void => {
     const engine = renderingEngineRef.current;
@@ -146,15 +182,11 @@ export function CanvasPanel(): JSX.Element {
   };
 
   return (
-    <div className="flex flex-1 items-center justify-center overflow-hidden bg-editor-bg p-4">
-      <div
-        className="relative"
-        style={{
-          aspectRatio: `${composition.width} / ${composition.height}`,
-          maxHeight: "100%",
-          maxWidth: "100%",
-        }}
-      >
+    <div
+      ref={containerRef}
+      className="flex flex-1 items-center justify-center overflow-hidden bg-editor-bg p-4"
+    >
+      <div className="relative" style={{ width: frameWidth, height: frameHeight }}>
         <canvas
           ref={canvasRef}
           width={composition.width}
