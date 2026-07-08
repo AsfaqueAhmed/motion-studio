@@ -17,6 +17,7 @@ import {
   createPropertyTrack,
   AddKeyframeCommand,
   DeleteKeyframeCommand,
+  ModifyKeyframeCommand,
   type AnimationEngine,
 } from "@motion-studio/animation";
 import type { LayerEngine } from "@motion-studio/layer";
@@ -41,29 +42,63 @@ export class InspectorEditorService {
   ) {}
 
   setLayerProperty(intent: ISetLayerPropertyIntent): void {
-    const { layerId, propertyKey, value } = intent.payload;
-    this.commandBus.execute(
-      new UpdateLayerCommand(crypto.randomUUID(), this.layerEngine, layerId, propertyKey, value),
-    );
+    const { layerId, propertyKey, value, tick } = intent.payload;
+    this.commandBus.execute(this.buildWriteCommand(layerId, propertyKey, value, tick));
   }
 
   /** Batched transform patch — one undo step for every changed field (e.g. a Canvas drag-resize/move gesture), unlike `setLayerProperty`'s single key. */
   setLayerTransform(intent: ISetLayerTransformIntent): void {
-    const { layerId, transform } = intent.payload;
-    const commands = (Object.keys(transform) as Array<keyof ITransform2D>).map(
-      (key) =>
-        new UpdateLayerCommand(
-          crypto.randomUUID(),
-          this.layerEngine,
-          layerId,
-          `transform.${key}`,
-          transform[key],
-        ),
+    const { layerId, transform, tick } = intent.payload;
+    const commands = (Object.keys(transform) as Array<keyof ITransform2D>).map((key) =>
+      this.buildWriteCommand(layerId, `transform.${key}`, transform[key], tick),
     );
     if (commands.length === 0) {
       return;
     }
     this.commandBus.execute(new CompositeCommand(crypto.randomUUID(), "Transform layer", commands));
+  }
+
+  /**
+   * A plain static write is invisible for an animated property — Frame
+   * State evaluation (and the Inspector's own `displayValue`) always
+   * prefers the evaluated/keyframed value over the Layer's static field
+   * whenever a track exists, so editing while animated has to go through
+   * keyframes instead: update the keyframe already at `tick` if one's
+   * there, otherwise add a new one there (this is how a second keyframe —
+   * actual animation — gets created). Only a property with no track at all
+   * writes straight to the static field.
+   */
+  private buildWriteCommand(
+    layerId: LayerId,
+    propertyKey: string,
+    value: unknown,
+    tick: Tick,
+  ): ICommand {
+    const clip = this.animationEngine.getClipForLayer(layerId);
+    const track = clip?.propertyTrackIds
+      .map((id) => this.animationEngine.propertyTracks.get(id))
+      .find((existing) => existing?.propertyKey === propertyKey);
+
+    if (!track) {
+      return new UpdateLayerCommand(
+        crypto.randomUUID(),
+        this.layerEngine,
+        layerId,
+        propertyKey,
+        value,
+      );
+    }
+    if (track.keyframes.some((keyframe) => keyframe.tick === tick)) {
+      return new ModifyKeyframeCommand(crypto.randomUUID(), this.animationEngine, track.id, tick, {
+        value,
+      });
+    }
+    return new AddKeyframeCommand(
+      crypto.randomUUID(),
+      this.animationEngine,
+      track.id,
+      createKeyframe({ tick, value }),
+    );
   }
 
   /**

@@ -28,7 +28,7 @@ describe("InspectorEditorService", () => {
   it("sets a static property and undoes back to the previous value", () => {
     service.setLayerProperty({
       type: "SetLayerProperty",
-      payload: { layerId, propertyKey: "opacity", value: 0.5 },
+      payload: { layerId, propertyKey: "opacity", value: 0.5, tick: toTick(0) },
     });
     expect(layerEngine.registry.get(layerId)?.opacity).toBe(0.5);
 
@@ -39,7 +39,7 @@ describe("InspectorEditorService", () => {
   it("applies a batched transform patch as one undo step", () => {
     service.setLayerTransform({
       type: "SetLayerTransform",
-      payload: { layerId, transform: { x: 50, y: 60, scaleX: 2, scaleY: 2 } },
+      payload: { layerId, transform: { x: 50, y: 60, scaleX: 2, scaleY: 2 }, tick: toTick(0) },
     });
     expect(layerEngine.registry.get(layerId)?.transform).toMatchObject({
       x: 50,
@@ -120,5 +120,38 @@ describe("InspectorEditorService", () => {
     });
 
     expect(animationEngine.getClipForLayer(layerId)?.id).toBe(clipAfterFirst?.id);
+  });
+
+  it("editing an animated property at an existing keyframe's tick modifies that keyframe, not the static field", () => {
+    const layerType = layerEngine.registry.get(layerId)!.type;
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType, tick: toTick(0) },
+    });
+
+    service.setLayerProperty({
+      type: "SetLayerProperty",
+      payload: { layerId, propertyKey: "transform.x", value: 42, tick: toTick(0) },
+    });
+
+    expect(animationEngine.evaluateAt(layerId, "transform.x", toTick(0))).toBe(42);
+    // The static field is untouched — the keyframe is the source of truth once animated.
+    expect(layerEngine.registry.get(layerId)?.transform.x).toBe(0);
+  });
+
+  it("editing an animated property at a tick with no keyframe adds a new one there instead of writing statically", () => {
+    const layerType = layerEngine.registry.get(layerId)!.type;
+    service.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId, layerType, tick: toTick(0) },
+    });
+
+    service.setLayerProperty({
+      type: "SetLayerProperty",
+      payload: { layerId, propertyKey: "transform.x", value: 100, tick: toTick(300) },
+    });
+
+    expect(animationEngine.evaluateAt(layerId, "transform.x", toTick(0))).toBe(0);
+    expect(animationEngine.evaluateAt(layerId, "transform.x", toTick(300))).toBe(100);
   });
 });

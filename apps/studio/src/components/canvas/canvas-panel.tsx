@@ -321,6 +321,7 @@ export function CanvasPanel(): JSX.Element {
                 scaleX: finalTransform.scaleX,
                 scaleY: finalTransform.scaleY,
               },
+        tick: kernel.playback.currentTick,
       },
     });
 

@@ -56,15 +56,30 @@ export type ISetCompositionSizeIntent = IIntent<
   { readonly compositionId: CompositionId; readonly width: number; readonly height: number }
 >;
 
+/**
+ * `tick` matters once the property is animated: if a keyframe already
+ * exists there, the edit modifies that keyframe's value; if the property
+ * is animated but no keyframe sits exactly at `tick`, the edit adds a new
+ * one there (this is how you actually build an animation — keyframe at
+ * tick 0, move the playhead, edit again). Only an unanimated property
+ * writes straight to the Layer's static field. See
+ * `InspectorEditorService`'s doc comment for why a plain static write
+ * would otherwise be silently invisible.
+ */
 export type ISetLayerPropertyIntent = IIntent<
   "SetLayerProperty",
-  { readonly layerId: LayerId; readonly propertyKey: string; readonly value: unknown }
+  {
+    readonly layerId: LayerId;
+    readonly propertyKey: string;
+    readonly value: unknown;
+    readonly tick: Tick;
+  }
 >;
 
-/** Batched transform patch — one undo step for several changed fields at once (e.g. a Canvas drag-resize/move gesture), unlike `SetLayerProperty`'s single key. */
+/** Batched transform patch — one undo step for several changed fields at once (e.g. a Canvas drag-resize/move gesture), unlike `SetLayerProperty`'s single key. Same keyframe-vs-static-write rule per field, see `ISetLayerPropertyIntent`. */
 export type ISetLayerTransformIntent = IIntent<
   "SetLayerTransform",
-  { readonly layerId: LayerId; readonly transform: Partial<ITransform2D> }
+  { readonly layerId: LayerId; readonly transform: Partial<ITransform2D>; readonly tick: Tick }
 >;
 
 /**

@@ -49,7 +49,7 @@ export function InspectorPanel(): JSX.Element {
   const setProperty = (row: IPropertySchemaRow, value: unknown): void => {
     kernel.inspectorEditor.setLayerProperty({
       type: "SetLayerProperty",
-      payload: { layerId: layer.id, propertyKey: row.key, value },
+      payload: { layerId: layer.id, propertyKey: row.key, value, tick: currentTick },
     });
   };
 
