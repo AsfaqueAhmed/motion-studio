@@ -88,7 +88,13 @@ describe("Canvas2DRenderBackend", () => {
       sceneGraph([
         node({
           layerId: "a",
-          texture: { kind: "image-source", source: fakeImage, width: 10, height: 10 },
+          texture: {
+            kind: "image-source",
+            source: fakeImage,
+            width: 10,
+            height: 10,
+            isLive: false,
+          },
         }),
       ]),
     );

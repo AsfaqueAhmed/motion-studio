@@ -19,6 +19,8 @@ export type ITextureSource =
       readonly source: CanvasImageSource;
       readonly width: number;
       readonly height: number;
+      /** `true` for a live `HTMLVideoElement` (re-upload every frame), `false` for a static `ImageBitmap` (upload once, cache forever). */
+      readonly isLive: boolean;
     }
   | {
       readonly kind: "raw-rgba";

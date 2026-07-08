@@ -1,6 +1,7 @@
 import {
   LayerType,
   RenderBackend,
+  createAssetId,
   createCompositionId,
   createLayerId,
   toTick,
@@ -86,5 +87,54 @@ describe("WebGL2RenderBackend", () => {
     backend.init({ width: 100, height: 100 });
     backend.dispose();
     expect(() => backend.drawFrame(sceneGraph([]))).toThrow(/init/);
+  });
+
+  it("uploads a resolved image-source texture via texImage2D instead of the placeholder color", () => {
+    const gl = new FakeWebGL2Context();
+    const backend = new WebGL2RenderBackend({ getContext: () => gl });
+    backend.init({ width: 100, height: 100 });
+    const fakeImage = {} as CanvasImageSource;
+    backend.drawFrame(
+      sceneGraph([
+        node({
+          layerId: "a",
+          assetId: createAssetId("asset-1"),
+          texture: {
+            kind: "image-source",
+            source: fakeImage,
+            width: 10,
+            height: 10,
+            isLive: false,
+          },
+        }),
+      ]),
+    );
+
+    const colorUniforms = gl.calls.filter((c) => c.op === "uniform4f" && c.name === "u_color");
+    expect(colorUniforms).toHaveLength(0);
+    const texImage2DCalls = gl.calls.filter((c) => c.op === "texImage2D");
+    expect(texImage2DCalls).toEqual([{ op: "texImage2D", source: fakeImage }]);
+  });
+
+  it("re-uploads a live video texture every frame but uploads a static image only once", () => {
+    const gl = new FakeWebGL2Context();
+    const backend = new WebGL2RenderBackend({ getContext: () => gl });
+    backend.init({ width: 100, height: 100 });
+    const fakeImage = {} as CanvasImageSource;
+    const staticNode = node({
+      layerId: "static",
+      assetId: createAssetId("asset-static"),
+      texture: { kind: "image-source", source: fakeImage, width: 10, height: 10, isLive: false },
+    });
+    const liveNode = node({
+      layerId: "live",
+      assetId: createAssetId("asset-live"),
+      texture: { kind: "image-source", source: fakeImage, width: 10, height: 10, isLive: true },
+    });
+
+    backend.drawFrame(sceneGraph([staticNode, liveNode]));
+    backend.drawFrame(sceneGraph([staticNode, liveNode]));
+
+    expect(gl.calls.filter((c) => c.op === "texImage2D")).toHaveLength(3);
   });
 });

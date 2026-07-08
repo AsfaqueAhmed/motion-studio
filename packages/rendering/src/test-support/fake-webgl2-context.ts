@@ -2,6 +2,7 @@ import type {
   IGLBuffer,
   IGLProgram,
   IGLShader,
+  IGLTexture,
   IGLUniformLocation,
   IWebGL2Context,
 } from "../webgl2-backend";
@@ -24,8 +25,10 @@ export type FakeGLCall =
   | { op: "useProgram" }
   | { op: "drawArrays"; mode: number; first: number; count: number }
   | { op: "uniform1f"; name: string; x: number }
+  | { op: "uniform1i"; name: string; x: number }
   | { op: "uniform2f"; name: string; x: number; y: number }
-  | { op: "uniform4f"; name: string; x: number; y: number; z: number; w: number };
+  | { op: "uniform4f"; name: string; x: number; y: number; z: number; w: number }
+  | { op: "texImage2D"; source: CanvasImageSource };
 
 /**
  * Minimal, always-succeeding fake of `IWebGL2Context` — no real GPU exists
@@ -46,6 +49,16 @@ export class FakeWebGL2Context implements IWebGL2Context {
   readonly SRC_ALPHA = 770;
   readonly ONE_MINUS_SRC_ALPHA = 771;
   readonly FLOAT = 5126;
+  readonly TEXTURE_2D = 3553;
+  readonly TEXTURE0 = 33984;
+  readonly RGBA = 6408;
+  readonly UNSIGNED_BYTE = 5121;
+  readonly LINEAR = 9729;
+  readonly CLAMP_TO_EDGE = 33071;
+  readonly TEXTURE_MIN_FILTER = 10241;
+  readonly TEXTURE_MAG_FILTER = 10240;
+  readonly TEXTURE_WRAP_S = 10242;
+  readonly TEXTURE_WRAP_T = 10243;
 
   readonly calls: FakeGLCall[] = [];
 
@@ -125,6 +138,10 @@ export class FakeWebGL2Context implements IWebGL2Context {
     this.calls.push({ op: "uniform1f", name: (location as FakeUniformLocation).name, x });
   }
 
+  uniform1i(location: IGLUniformLocation | null, x: number): void {
+    this.calls.push({ op: "uniform1i", name: (location as FakeUniformLocation).name, x });
+  }
+
   uniform2f(location: IGLUniformLocation | null, x: number, y: number): void {
     this.calls.push({ op: "uniform2f", name: (location as FakeUniformLocation).name, x, y });
   }
@@ -148,4 +165,27 @@ export class FakeWebGL2Context implements IWebGL2Context {
   drawArrays(mode: number, first: number, count: number): void {
     this.calls.push({ op: "drawArrays", mode, first, count });
   }
+
+  createTexture(): IGLTexture {
+    return {};
+  }
+
+  bindTexture(): void {}
+
+  texParameteri(): void {}
+
+  texImage2D(
+    _target: number,
+    _level: number,
+    _internalformat: number,
+    _format: number,
+    _type: number,
+    source: CanvasImageSource,
+  ): void {
+    this.calls.push({ op: "texImage2D", source });
+  }
+
+  activeTexture(): void {}
+
+  deleteTexture(): void {}
 }
