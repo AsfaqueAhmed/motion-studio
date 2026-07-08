@@ -51,14 +51,16 @@ function AssetTile({
 }): JSX.Element {
   const kernel = useEditorKernel();
   const thumbnailUrl = useAssetThumbnailUrl(kernel, entry);
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `asset-${entry.id}`,
     data: { type: "asset", assetId: entry.id, assetType: entry.type, name: entry.name },
   });
 
-  const style = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-  };
+  // The floating `DragOverlay` in `EditorShell` renders the drag preview now,
+  // so the source tile just hides — without this it stayed pinned via CSS
+  // `transform` inside this panel's `overflow-y-auto`, clipping invisible
+  // the moment the pointer left the panel.
+  const style = { opacity: isDragging ? 0 : undefined };
 
   if (view === "list") {
     return (

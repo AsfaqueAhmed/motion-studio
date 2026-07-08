@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { useEffect, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import {
   PlaybackState,
   secondsToTicks,
@@ -84,6 +92,16 @@ function handleDragEnd(kernel: EditorKernel, event: DragEndEvent): void {
   });
 }
 
+/** Resolves a human-readable label for the floating `DragOverlay` preview. */
+function dragLabel(kernel: EditorKernel, dragData: DragData): string {
+  if (dragData.type === "asset") {
+    return dragData.name;
+  }
+  const trackItem = kernel.timelineEngine.requireTrackItem(dragData.trackItemId);
+  const layer = kernel.layerEngine.registry.get(trackItem.layerId);
+  return layer?.name ?? "Clip";
+}
+
 const GLOBAL_BINDINGS = [
   { key: "Delete", commandId: "DeleteSelection" },
   { key: "Backspace", commandId: "DeleteSelection" },
@@ -154,6 +172,12 @@ export function EditorShell(): JSX.Element {
   // on a clip/asset tile needs — 4px matches dnd-kit's own recommended
   // default for this exact click-vs-drag ambiguity.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+
+  const handleDragStart = (event: DragStartEvent): void => {
+    const activeData = event.active.data.current as DragData | undefined;
+    setActiveLabel(activeData ? dragLabel(kernel, activeData) : null);
+  };
 
   useEffect(() => {
     for (const binding of GLOBAL_BINDINGS) {
@@ -186,7 +210,16 @@ export function EditorShell(): JSX.Element {
   }, [kernel]);
 
   return (
-    <DndContext sensors={sensors} onDragEnd={(event) => handleDragEnd(kernel, event)}>
+    <DndContext
+      sensors={sensors}
+      autoScroll={false}
+      onDragStart={handleDragStart}
+      onDragEnd={(event) => {
+        setActiveLabel(null);
+        handleDragEnd(kernel, event);
+      }}
+      onDragCancel={() => setActiveLabel(null)}
+    >
       <div className="flex h-screen flex-col bg-editor-bg text-editor-text">
         <ToolbarPanel />
         <div className="flex flex-1 overflow-hidden">
@@ -200,6 +233,13 @@ export function EditorShell(): JSX.Element {
         </div>
         <TimelinePanel />
       </div>
+      <DragOverlay>
+        {activeLabel ? (
+          <div className="cursor-grabbing rounded-lg border border-editor-border bg-editor-surface-raised px-2 py-1 text-xs text-editor-text shadow-lg">
+            {activeLabel}
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }

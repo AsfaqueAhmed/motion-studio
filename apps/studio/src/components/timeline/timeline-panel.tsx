@@ -140,7 +140,7 @@ function ClipBar({
   width: number;
   selected: boolean;
 }): JSX.Element {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `clip-${trackItemId}`,
     data: { type: "clip", trackItemId },
   });
@@ -166,7 +166,7 @@ function ClipBar({
       style={{
         left,
         width: Math.max(width, 4),
-        transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined,
+        opacity: isDragging ? 0 : undefined,
       }}
     >
       <Icon className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
