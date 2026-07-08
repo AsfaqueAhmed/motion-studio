@@ -66,6 +66,22 @@ export class AnimationEngine implements IEngine {
     return this.clips.getAll().find((clip) => clip.layerId === layerId);
   }
 
+  /** Every distinct tick with a keyframe on any of the Layer's property tracks, sorted ascending — the shared query behind a unified "keyframe at the playhead" toggle and Timeline clip-strip markers, so neither has to walk clip → tracks → keyframes itself. */
+  getKeyframeTicksForLayer(layerId: LayerId): Tick[] {
+    const clip = this.getClipForLayer(layerId);
+    if (!clip) {
+      return [];
+    }
+    const ticks = new Set<Tick>();
+    for (const trackId of clip.propertyTrackIds) {
+      const track = this.propertyTracks.get(trackId);
+      for (const keyframe of track?.keyframes ?? []) {
+        ticks.add(keyframe.tick);
+      }
+    }
+    return [...ticks].sort((a, b) => a - b);
+  }
+
   /** Adds a Property Track to its Clip, rejecting a second track for a property the Clip already animates. */
   addPropertyTrack(track: IPropertyTrack): void {
     const clip = this.requireClip(track.clipId);

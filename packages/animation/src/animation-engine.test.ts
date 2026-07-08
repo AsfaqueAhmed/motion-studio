@@ -144,4 +144,28 @@ describe("AnimationEngine", () => {
     expect(engine.propertyTracks.has(track.id)).toBe(false);
     expect(engine.clips.has(clip.id)).toBe(false);
   });
+
+  it("getKeyframeTicksForLayer returns undefined for a layer with no clip", () => {
+    const engine = new AnimationEngine();
+    engine.initialize();
+    expect(engine.getKeyframeTicksForLayer(createLayerId("no-clip"))).toEqual([]);
+  });
+
+  it("getKeyframeTicksForLayer dedupes and sorts ticks across every property track on the layer", () => {
+    const { engine, layerId, clip, track } = setup();
+    const secondTrack = createPropertyTrack({
+      id: createPropertyTrackId("track-x"),
+      clipId: clip.id,
+      propertyKey: "transform.x",
+      valueType: PropertyValueType.Number,
+    });
+    engine.addPropertyTrack(secondTrack);
+
+    engine.addKeyframe(track.id, createKeyframe({ tick: toTick(300), value: 1 }));
+    engine.addKeyframe(track.id, createKeyframe({ tick: toTick(0), value: 0 }));
+    engine.addKeyframe(secondTrack.id, createKeyframe({ tick: toTick(0), value: 10 }));
+    engine.addKeyframe(secondTrack.id, createKeyframe({ tick: toTick(150), value: 20 }));
+
+    expect(engine.getKeyframeTicksForLayer(layerId)).toEqual([toTick(0), toTick(150), toTick(300)]);
+  });
 });
