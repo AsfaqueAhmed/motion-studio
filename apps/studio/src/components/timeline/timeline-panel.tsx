@@ -7,7 +7,6 @@ import {
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import {
@@ -277,36 +276,69 @@ export function TimelinePanel(): JSX.Element {
   const kernel = useEditorKernel();
   useEngineRevisionStore((state) => state.revision);
   const zoomTicksPerPixel = useTimelineStore((state) => state.zoomTicksPerPixel);
-  const setZoom = useTimelineStore((state) => state.setZoom);
   const [currentTick, setCurrentTick] = useState(kernel.playback.currentTick);
   const trackAreaRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => kernel.playback.onTick(setCurrentTick), [kernel]);
 
-  const composition = kernel.timelineEngine.requireComposition(kernel.defaultCompositionId);
-
   // Ctrl+wheel (also how browsers report trackpad pinch) zooms, matching every
   // other timeline editor's convention — plain wheel keeps scrolling this
-  // panel's own track list, which multi-track projects need.
-  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>): void => {
-    if (!event.ctrlKey) {
+  // panel's own track list, which multi-track projects need. Attached as a
+  // real, non-passive DOM listener rather than JSX `onWheel`: React registers
+  // its synthetic wheel/touch listeners as passive at the root, so
+  // `preventDefault()` inside a React onWheel handler is silently a no-op —
+  // the browser's native pinch/ctrl+wheel page zoom fires anyway.
+  useEffect(() => {
+    const element = scrollAreaRef.current;
+    if (!element) {
       return;
     }
-    event.preventDefault();
-    setZoom(
-      Math.min(
-        MAX_ZOOM_TICKS_PER_PIXEL,
-        Math.max(
-          MIN_ZOOM_TICKS_PER_PIXEL,
-          zoomTicksPerPixel + event.deltaY * ZOOM_WHEEL_SENSITIVITY,
+    const handleWheel = (event: WheelEvent): void => {
+      if (!event.ctrlKey) {
+        return;
+      }
+      event.preventDefault();
+      const state = useTimelineStore.getState();
+      state.setZoom(
+        Math.min(
+          MAX_ZOOM_TICKS_PER_PIXEL,
+          Math.max(
+            MIN_ZOOM_TICKS_PER_PIXEL,
+            state.zoomTicksPerPixel + event.deltaY * ZOOM_WHEEL_SENSITIVITY,
+          ),
         ),
-      ),
-    );
-  };
+      );
+    };
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  // Safari doesn't route trackpad pinch through ctrlKey `wheel` events at
+  // all — it recognizes the pinch gesture itself and fires its own
+  // (non-standard, WebKit-only) gesture events, which the page-zoom default
+  // rides along on regardless of what the `wheel` listener above does.
+  useEffect(() => {
+    const element = scrollAreaRef.current;
+    if (!element) {
+      return;
+    }
+    const preventGesture: EventListener = (event) => event.preventDefault();
+    element.addEventListener("gesturestart", preventGesture);
+    element.addEventListener("gesturechange", preventGesture);
+    element.addEventListener("gestureend", preventGesture);
+    return () => {
+      element.removeEventListener("gesturestart", preventGesture);
+      element.removeEventListener("gesturechange", preventGesture);
+      element.removeEventListener("gestureend", preventGesture);
+    };
+  }, []);
+
+  const composition = kernel.timelineEngine.requireComposition(kernel.defaultCompositionId);
 
   return (
     <div className="flex h-64 flex-col overflow-hidden border-t border-editor-border bg-editor-bg">
-      <div className="flex flex-1 overflow-auto" onWheel={handleWheel}>
+      <div ref={scrollAreaRef} className="flex flex-1 overflow-auto">
         <div className="flex shrink-0 flex-col">
           <div className="h-6 shrink-0 border-b border-r border-editor-border bg-editor-surface" />
           {composition.tracks.map((trackId) => {
