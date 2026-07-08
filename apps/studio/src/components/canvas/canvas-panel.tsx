@@ -190,7 +190,11 @@ export function CanvasPanel(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    const textureResolver = new TextureSourceResolver(kernel.assetManager);
+    const textureResolver = new TextureSourceResolver(kernel.assetManager, () => {
+      if (!cancelled) {
+        renderCurrentFrame();
+      }
+    });
     textureResolverRef.current = textureResolver;
 
     createRenderBackend(canvasRef.current!)

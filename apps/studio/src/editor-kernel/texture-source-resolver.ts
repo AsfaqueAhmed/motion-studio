@@ -22,6 +22,14 @@ const SEEK_THRESHOLD_SECONDS = 1 / 30;
  * decode and returns `undefined` for the current frame, so the backend
  * falls back to the placeholder color until the next frame after decode
  * finishes. No blocking awaits in the render loop.
+ *
+ * That "next frame" only actually happens if something asks for one —
+ * `CanvasPanel` only re-renders on a Playhead tick or a Command Bus
+ * revision bump, neither of which fires just because a background decode
+ * finished. A layer dropped while paused would otherwise render once
+ * against a still-`undefined` `getDimensions()` (falling back to
+ * `PLACEHOLDER_BOUNDS`) and then never repaint again even after the real
+ * dimensions/texture resolve — `onResolved` closes that gap.
  */
 export class TextureSourceResolver implements ITextureSourceProvider {
   private readonly imageSources = new Map<AssetId, ImageBitmap>();
@@ -29,7 +37,10 @@ export class TextureSourceResolver implements ITextureSourceProvider {
   private readonly dimensions = new Map<AssetId, IResolvedDimensions>();
   private readonly pending = new Set<AssetId>();
 
-  constructor(private readonly assetManager: AssetManager) {}
+  constructor(
+    private readonly assetManager: AssetManager,
+    private readonly onResolved?: () => void,
+  ) {}
 
   resolve(assetId: AssetId): ITextureSource | undefined {
     const image = this.imageSources.get(assetId);
@@ -112,7 +123,10 @@ export class TextureSourceResolver implements ITextureSourceProvider {
     this.pending.add(assetId);
     this.load(assetId)
       .catch(() => {})
-      .finally(() => this.pending.delete(assetId));
+      .finally(() => {
+        this.pending.delete(assetId);
+        this.onResolved?.();
+      });
   }
 
   private async load(assetId: AssetId): Promise<void> {
