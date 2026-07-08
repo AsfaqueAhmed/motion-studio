@@ -139,7 +139,7 @@ describe("InspectorEditorService", () => {
     expect(layerEngine.registry.get(layerId)?.transform.x).toBe(0);
   });
 
-  it("editing an animated property at a tick with no keyframe adds a new one there instead of writing statically", () => {
+  it("editing an animated property at a tick with no keyframe does not create one — only the toggle button creates keyframes", () => {
     const layerType = layerEngine.registry.get(layerId)!.type;
     service.toggleKeyframe({
       type: "ToggleKeyframe",
@@ -151,7 +151,17 @@ describe("InspectorEditorService", () => {
       payload: { layerId, propertyKey: "transform.x", value: 100, tick: toTick(300) },
     });
 
-    expect(animationEngine.evaluateAt(layerId, "transform.x", toTick(0))).toBe(0);
-    expect(animationEngine.evaluateAt(layerId, "transform.x", toTick(300))).toBe(100);
+    // No keyframe was added at tick 300 — the existing tick-0 keyframe
+    // still evaluates as a constant everywhere, so the edit's value is
+    // invisible until a keyframe is explicitly added at that tick.
+    expect(animationEngine.evaluateAt(layerId, "transform.x", toTick(300))).toBe(0);
+    // The write landed on the (now-shadowed) static field, not a new keyframe.
+    expect(layerEngine.registry.get(layerId)?.transform.x).toBe(100);
+    expect(
+      animationEngine
+        .getClipForLayer(layerId)
+        ?.propertyTrackIds.map((id) => animationEngine.propertyTracks.get(id))
+        .find((track) => track?.propertyKey === "transform.x")?.keyframes,
+    ).toHaveLength(1);
   });
 });

@@ -59,14 +59,15 @@ export class InspectorEditorService {
   }
 
   /**
-   * A plain static write is invisible for an animated property — Frame
-   * State evaluation (and the Inspector's own `displayValue`) always
-   * prefers the evaluated/keyframed value over the Layer's static field
-   * whenever a track exists, so editing while animated has to go through
-   * keyframes instead: update the keyframe already at `tick` if one's
-   * there, otherwise add a new one there (this is how a second keyframe —
-   * actual animation — gets created). Only a property with no track at all
-   * writes straight to the static field.
+   * Editing never creates a keyframe by itself — the toggle button
+   * (`toggleKeyframe`) is the only sanctioned way to "save" one. If `tick`
+   * already has a keyframe on this property, the edit updates that
+   * keyframe's value (not a new one, just changing what's already there).
+   * Otherwise it writes the plain static field — for an animated property
+   * this is invisible until a keyframe exists at this tick (Frame State
+   * evaluation prefers the keyframed value whenever a track exists), which
+   * is intentional: add a keyframe here first via the toggle button, then
+   * edit it.
    */
   private buildWriteCommand(
     layerId: LayerId,
@@ -79,25 +80,17 @@ export class InspectorEditorService {
       .map((id) => this.animationEngine.propertyTracks.get(id))
       .find((existing) => existing?.propertyKey === propertyKey);
 
-    if (!track) {
-      return new UpdateLayerCommand(
-        crypto.randomUUID(),
-        this.layerEngine,
-        layerId,
-        propertyKey,
-        value,
-      );
-    }
-    if (track.keyframes.some((keyframe) => keyframe.tick === tick)) {
+    if (track?.keyframes.some((keyframe) => keyframe.tick === tick)) {
       return new ModifyKeyframeCommand(crypto.randomUUID(), this.animationEngine, track.id, tick, {
         value,
       });
     }
-    return new AddKeyframeCommand(
+    return new UpdateLayerCommand(
       crypto.randomUUID(),
-      this.animationEngine,
-      track.id,
-      createKeyframe({ tick, value }),
+      this.layerEngine,
+      layerId,
+      propertyKey,
+      value,
     );
   }
 
