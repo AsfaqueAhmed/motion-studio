@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Tick } from "@motion-studio/shared";
 import { useEditorKernel } from "../editor-kernel-provider";
 import { useTimelineStore } from "../../state/use-timeline-store";
@@ -8,14 +8,18 @@ import { useEngineRevisionStore } from "../../state/use-engine-revision-store";
 import { getLayerPropertyValue } from "../../editor-kernel/layer-property-path";
 import type { IPropertySchemaRow } from "../../editor-kernel/property-schema-registry";
 
+/** How long to wait after the last change to a field before it actually commits (and creates/updates a keyframe, if animated) — see `setProperty`'s doc comment. */
+const COMMIT_DEBOUNCE_MS = 1000;
+
 /**
  * Schema-driven Property System (PLAN.md 15.4). Displayed values are the
  * live-evaluated value at the current playhead tick when a keyframe track
  * exists, falling back to the Layer's static value otherwise — editing
- * always writes the static value via `SetLayerPropertyIntent`
- * (`InspectorEditorService`), never the evaluated one. Inline validation
- * here is a UX convenience only; real enforcement lives in the Command
- * handlers (`UpdateLayerCommand`/`AddKeyframeCommand`), per CLAUDE.md.
+ * writes through `SetLayerPropertyIntent` (`InspectorEditorService`),
+ * which itself decides whether that lands on the static field or a
+ * keyframe. Inline validation here is a UX convenience only; real
+ * enforcement lives in the Command handlers (`UpdateLayerCommand`/
+ * `AddKeyframeCommand`/`ModifyKeyframeCommand`), per CLAUDE.md.
  *
  * Renders as a floating overlay rather than docked chrome — `EditorShell`
  * only mounts this when there's a selection, matching the CapCut-style
@@ -26,6 +30,13 @@ export function InspectorPanel(): JSX.Element {
   useEngineRevisionStore((state) => state.revision);
   const selection = useTimelineStore((state) => state.selection);
   const [currentTick, setCurrentTick] = useState<Tick>(kernel.playback.currentTick);
+  // Keyed by `${layerId}:${propertyKey}` so two layers sharing a property
+  // key (e.g. both have "transform.x") never bleed pending values into
+  // each other. Values here are what the field shows *right now*; commits
+  // (and therefore keyframe creation) only happen once the debounce timer
+  // below actually fires.
+  const [pendingValues, setPendingValues] = useState<Map<string, unknown>>(new Map());
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => kernel.playback.onTick(setCurrentTick), [kernel]);
 
@@ -39,6 +50,10 @@ export function InspectorPanel(): JSX.Element {
   const schema = kernel.propertySchemaRegistry.getSchema(layer.type);
 
   const displayValue = (row: IPropertySchemaRow): unknown => {
+    const pendingKey = `${layer.id}:${row.key}`;
+    if (pendingValues.has(pendingKey)) {
+      return pendingValues.get(pendingKey);
+    }
     if (!row.animatable) {
       return getLayerPropertyValue(layer, row.key);
     }
@@ -46,11 +61,38 @@ export function InspectorPanel(): JSX.Element {
     return evaluated !== undefined ? evaluated : getLayerPropertyValue(layer, row.key);
   };
 
+  /**
+   * Debounced commit: every change updates the field's own display
+   * immediately (so typing/dragging feels instant), but the actual write —
+   * and, for an animated property, the keyframe add/update this now
+   * implies (`InspectorEditorService.setLayerProperty`) — only happens
+   * once a full second passes with no further change to this field.
+   * Without this, every keystroke/spinner click on an animated property
+   * created or moved a keyframe by itself, cluttering the timeline with
+   * one per intermediate value instead of one for the value the user
+   * actually settled on.
+   */
   const setProperty = (row: IPropertySchemaRow, value: unknown): void => {
-    kernel.inspectorEditor.setLayerProperty({
-      type: "SetLayerProperty",
-      payload: { layerId: layer.id, propertyKey: row.key, value, tick: currentTick },
-    });
+    const pendingKey = `${layer.id}:${row.key}`;
+    setPendingValues((previous) => new Map(previous).set(pendingKey, value));
+
+    const existingTimer = timersRef.current.get(pendingKey);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    const timer = setTimeout(() => {
+      timersRef.current.delete(pendingKey);
+      kernel.inspectorEditor.setLayerProperty({
+        type: "SetLayerProperty",
+        payload: { layerId: layer.id, propertyKey: row.key, value, tick: currentTick },
+      });
+      setPendingValues((previous) => {
+        const next = new Map(previous);
+        next.delete(pendingKey);
+        return next;
+      });
+    }, COMMIT_DEBOUNCE_MS);
+    timersRef.current.set(pendingKey, timer);
   };
 
   return (
