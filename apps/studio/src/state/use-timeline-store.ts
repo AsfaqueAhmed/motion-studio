@@ -18,6 +18,10 @@ interface ITimelineState {
 
 const EMPTY_SELECTION: ITimelineSelection = { layerIds: [], trackItemIds: [] };
 
+/** Shared zoom bounds — the Timeline's wheel/pinch handler and PlaybackBar's zoom buttons/slider both clamp to these. */
+export const MIN_ZOOM_TICKS_PER_PIXEL = 1;
+export const MAX_ZOOM_TICKS_PER_PIXEL = 20;
+
 /** UI-only Timeline panel state (PLAN.md 15.7) — zoom/scroll/selection, never project data. */
 export const useTimelineStore = create<ITimelineState>((set) => ({
   zoomTicksPerPixel: 3,

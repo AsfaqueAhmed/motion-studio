@@ -16,6 +16,10 @@ import type { IPropertySchemaRow } from "../../editor-kernel/property-schema-reg
  * (`InspectorEditorService`), never the evaluated one. Inline validation
  * here is a UX convenience only; real enforcement lives in the Command
  * handlers (`UpdateLayerCommand`/`AddKeyframeCommand`), per CLAUDE.md.
+ *
+ * Renders as a floating overlay rather than docked chrome — `EditorShell`
+ * only mounts this when there's a selection, matching the CapCut-style
+ * reskin's reference screenshot (no persistent right panel).
  */
 export function InspectorPanel(): JSX.Element {
   const kernel = useEditorKernel();
@@ -29,11 +33,7 @@ export function InspectorPanel(): JSX.Element {
   const layer = layerId ? kernel.layerEngine.registry.get(layerId) : undefined;
 
   if (!layer) {
-    return (
-      <aside className="flex items-center justify-center border-l border-editor-border bg-editor-surface p-4 text-xs text-editor-text-muted">
-        No selection
-      </aside>
-    );
+    return <></>;
   }
 
   const schema = kernel.propertySchemaRegistry.getSchema(layer.type);
@@ -67,7 +67,7 @@ export function InspectorPanel(): JSX.Element {
   };
 
   return (
-    <aside className="flex flex-col gap-2 overflow-y-auto border-l border-editor-border bg-editor-surface p-3 text-xs">
+    <aside className="absolute right-4 top-4 z-20 flex max-h-[calc(100%-2rem)] w-64 flex-col gap-2 overflow-y-auto rounded-xl border border-editor-border bg-editor-surface p-3 text-xs shadow-2xl shadow-black/50">
       <h2 className="text-sm font-semibold">{layer.name}</h2>
       <span className="text-editor-text-muted">{layer.type}</span>
 

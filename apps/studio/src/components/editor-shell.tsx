@@ -14,9 +14,11 @@ import {
 import { useEditorKernel } from "./editor-kernel-provider";
 import { ToolbarPanel } from "./toolbar/toolbar-panel";
 import { CanvasPanel } from "./canvas/canvas-panel";
+import { PlaybackBar } from "./canvas/playback-bar";
 import { TimelinePanel } from "./timeline/timeline-panel";
 import { InspectorPanel } from "./inspector/inspector-panel";
-import { AssetBrowserPanel } from "./asset-browser/asset-browser-panel";
+import { IconRail } from "./rail/icon-rail";
+import { LeftPanel } from "./rail/left-panel";
 import { useTimelineStore } from "../state/use-timeline-store";
 import { useCanvasStore } from "../state/use-canvas-store";
 import type { EditorKernel } from "../editor-kernel/editor-kernel";
@@ -136,13 +138,17 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Fixed CSS grid — Toolbar, Timeline, Inspector, Asset Browser, Canvas each
- * in a static cell. No dockable Split/Stack/Panel tree, no floating panels,
- * no layout-undo (ADR-011) — `docs/17-ui/docking.md`'s real engine is
- * deferred to its own future pass (Phase 15 scope decision).
+ * Fixed flex layout (CapCut-style reskin, M11) — Toolbar, IconRail+LeftPanel,
+ * Canvas+PlaybackBar, Timeline each in a static region. No dockable
+ * Split/Stack/Panel tree, no layout-undo (ADR-011) — `docs/17-ui/docking.md`'s
+ * real engine is deferred to its own future pass (Phase 15 scope decision).
+ * The Inspector is the one floating exception: it overlays the canvas
+ * region and only mounts when something is selected, matching the
+ * reference screenshot's lack of persistent right-side chrome.
  */
 export function EditorShell(): JSX.Element {
   const kernel = useEditorKernel();
+  const hasSelection = useTimelineStore((state) => state.selection.layerIds.length > 0);
   // Without an activation distance, `PointerSensor` starts a drag on the
   // very first pointermove, which swallows the click a plain selection tap
   // on a clip/asset tile needs — 4px matches dnd-kit's own recommended
@@ -181,12 +187,16 @@ export function EditorShell(): JSX.Element {
 
   return (
     <DndContext sensors={sensors} onDragEnd={(event) => handleDragEnd(kernel, event)}>
-      <div className="grid h-screen grid-rows-[auto_1fr_260px] bg-editor-bg text-editor-text">
+      <div className="flex h-screen flex-col bg-editor-bg text-editor-text">
         <ToolbarPanel />
-        <div className="grid grid-cols-[240px_1fr_280px] overflow-hidden">
-          <AssetBrowserPanel />
-          <CanvasPanel />
-          <InspectorPanel />
+        <div className="flex flex-1 overflow-hidden">
+          <IconRail />
+          <LeftPanel />
+          <div id="canvas-stage" className="relative flex flex-1 flex-col overflow-hidden">
+            <CanvasPanel />
+            <PlaybackBar />
+            {hasSelection && <InspectorPanel />}
+          </div>
         </div>
         <TimelinePanel />
       </div>

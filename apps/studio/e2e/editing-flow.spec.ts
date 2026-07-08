@@ -67,6 +67,12 @@ test("import an asset, place it on the Timeline, edit it, move it, then undo/red
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Motion Studio" })).toBeVisible();
 
+  // The Asset Browser (and its Import file input) only renders when the
+  // left rail's "Photos" tab is active — the rail defaults to "Effects"
+  // (`useRailStore`), matching the CapCut-style reskin's reference
+  // screenshot, which highlights Effects by default.
+  await page.getByRole("button", { name: "Photos", exact: true }).click();
+
   const fileName = "photo.png";
   await importTestAsset(page, fileName);
 

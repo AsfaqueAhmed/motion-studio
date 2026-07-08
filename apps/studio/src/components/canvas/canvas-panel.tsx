@@ -131,7 +131,7 @@ export function CanvasPanel(): JSX.Element {
   };
 
   return (
-    <div className="flex items-center justify-center overflow-hidden bg-editor-bg p-4">
+    <div className="flex flex-1 items-center justify-center overflow-hidden bg-editor-bg p-4">
       <div
         className="relative"
         style={{
@@ -144,14 +144,14 @@ export function CanvasPanel(): JSX.Element {
           ref={canvasRef}
           width={composition.width}
           height={composition.height}
-          className="absolute inset-0 h-full w-full rounded border border-editor-border bg-black"
+          className="absolute inset-0 h-full w-full rounded-2xl border border-editor-border bg-black shadow-2xl shadow-black/50"
         />
         <canvas
           ref={overlayRef}
           width={composition.width}
           height={composition.height}
           onPointerDown={handlePointerDown}
-          className="absolute inset-0 h-full w-full"
+          className="absolute inset-0 h-full w-full rounded-2xl"
         />
       </div>
     </div>

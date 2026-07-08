@@ -13,21 +13,22 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@motion-studio/shared": "workspace:*",
-    "@motion-studio/core": "workspace:*",
-    "@motion-studio/storage": "workspace:*",
-    "@motion-studio/assets": "workspace:*",
-    "@motion-studio/layer": "workspace:*",
-    "@motion-studio/timeline": "workspace:*",
+    "@dnd-kit/core": "^6.1.0",
     "@motion-studio/animation": "workspace:*",
-    "@motion-studio/rendering": "workspace:*",
+    "@motion-studio/assets": "workspace:*",
+    "@motion-studio/core": "workspace:*",
     "@motion-studio/history": "workspace:*",
+    "@motion-studio/layer": "workspace:*",
     "@motion-studio/plugin": "workspace:*",
+    "@motion-studio/rendering": "workspace:*",
+    "@motion-studio/shared": "workspace:*",
+    "@motion-studio/storage": "workspace:*",
+    "@motion-studio/timeline": "workspace:*",
+    "lucide-react": "^1.23.0",
     "next": "^14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "zustand": "^5.0.1",
-    "@dnd-kit/core": "^6.1.0"
+    "zustand": "^5.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
