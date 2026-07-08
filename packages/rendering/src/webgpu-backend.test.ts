@@ -1,6 +1,7 @@
 import {
   LayerType,
   RenderBackend,
+  createAssetId,
   createCompositionId,
   createLayerId,
   toTick,
@@ -89,5 +90,55 @@ describe("WebGPURenderBackend", () => {
     backend.init({ width: 100, height: 100 });
     backend.dispose();
     expect(() => backend.drawFrame(sceneGraph([]))).toThrow(/init/);
+  });
+
+  it("uploads a resolved image-source texture via copyExternalImageToTexture", () => {
+    const { backend, device } = makeBackend();
+    backend.init({ width: 100, height: 100 });
+    const fakeImage = {} as CanvasImageSource;
+    backend.drawFrame(
+      sceneGraph([
+        node({
+          layerId: "a",
+          assetId: createAssetId("asset-1"),
+          texture: {
+            kind: "image-source",
+            source: fakeImage,
+            width: 10,
+            height: 10,
+            isLive: false,
+          },
+        }),
+      ]),
+    );
+
+    const copyCalls = device.calls.filter((c) => c.op === "copyExternalImageToTexture");
+    expect(copyCalls).toEqual([{ op: "copyExternalImageToTexture", source: fakeImage }]);
+    const uniformWrite = device.calls.find(
+      (c): c is Extract<typeof c, { op: "writeBuffer" }> =>
+        c.op === "writeBuffer" && c.data.length === 12,
+    );
+    expect(uniformWrite).toBeDefined();
+  });
+
+  it("re-uploads a live video texture every frame but uploads a static image only once", () => {
+    const { backend, device } = makeBackend();
+    backend.init({ width: 100, height: 100 });
+    const fakeImage = {} as CanvasImageSource;
+    const staticNode = node({
+      layerId: "static",
+      assetId: createAssetId("asset-static"),
+      texture: { kind: "image-source", source: fakeImage, width: 10, height: 10, isLive: false },
+    });
+    const liveNode = node({
+      layerId: "live",
+      assetId: createAssetId("asset-live"),
+      texture: { kind: "image-source", source: fakeImage, width: 10, height: 10, isLive: true },
+    });
+
+    backend.drawFrame(sceneGraph([staticNode, liveNode]));
+    backend.drawFrame(sceneGraph([staticNode, liveNode]));
+
+    expect(device.calls.filter((c) => c.op === "copyExternalImageToTexture")).toHaveLength(3);
   });
 });

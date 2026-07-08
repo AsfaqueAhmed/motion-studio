@@ -1,8 +1,10 @@
+import type { AssetId } from "@motion-studio/shared";
 import { RenderBackend } from "@motion-studio/shared";
 import { placeholderColor } from "./placeholder-color";
 import type { IRenderBackend, IRenderTargetSize } from "./render-backend";
 import { sortRenderQueue } from "./render-queue";
 import type { ISceneGraph, ISceneGraphNode } from "./scene-graph";
+import type { ITextureSource } from "./texture-source";
 
 export type IGPUShaderModule = object;
 export type IGPUBuffer = object;
@@ -10,6 +12,11 @@ export type IGPUBindGroupLayout = object;
 export type IGPUBindGroup = object;
 export type IGPUTextureView = object;
 export type IGPUCommandBuffer = object;
+export type IGPUSampler = object;
+
+export interface IGPUTexture {
+  createView(): IGPUTextureView;
+}
 
 export interface IGPURenderPipeline {
   getBindGroupLayout(index: number): IGPUBindGroupLayout;
@@ -35,9 +42,17 @@ export interface IGPUCommandEncoder {
   finish(): IGPUCommandBuffer;
 }
 
+export type IGPUBindingResource = { buffer: IGPUBuffer } | IGPUSampler | IGPUTextureView;
+
 export interface IGPUQueue {
   writeBuffer(buffer: IGPUBuffer, bufferOffset: number, data: Float32Array): void;
   submit(commandBuffers: readonly IGPUCommandBuffer[]): void;
+  /** Real WebGPU API for uploading an `ImageBitmap`/`HTMLVideoElement` directly — no manual byte extraction needed. */
+  copyExternalImageToTexture(
+    source: { source: CanvasImageSource },
+    destination: { texture: IGPUTexture },
+    copySize: { width: number; height: number },
+  ): void;
 }
 
 export interface IGPUCanvasContext {
@@ -73,9 +88,20 @@ export interface IGPUDevice {
   }): IGPURenderPipeline;
   createBindGroup(descriptor: {
     layout: IGPUBindGroupLayout;
-    entries: ReadonlyArray<{ binding: number; resource: { buffer: IGPUBuffer } }>;
+    entries: ReadonlyArray<{ binding: number; resource: IGPUBindingResource }>;
   }): IGPUBindGroup;
   createCommandEncoder(): IGPUCommandEncoder;
+  createTexture(descriptor: {
+    size: { width: number; height: number };
+    format: string;
+    usage: number;
+  }): IGPUTexture;
+  createSampler(descriptor: {
+    magFilter: string;
+    minFilter: string;
+    addressModeU: string;
+    addressModeV: string;
+  }): IGPUSampler;
 }
 
 export interface IWebGPUBackendDependencies {
@@ -90,8 +116,18 @@ const GPU_BUFFER_USAGE_VERTEX = 0x20;
 const GPU_BUFFER_USAGE_UNIFORM = 0x40;
 const GPU_BUFFER_USAGE_COPY_DST = 0x8;
 
+// WebGPU spec-fixed GPUTextureUsage bit flags. RENDER_ATTACHMENT is required
+// alongside COPY_DST for `copyExternalImageToTexture`'s destination per spec.
+const GPU_TEXTURE_USAGE_TEXTURE_BINDING = 0x4;
+const GPU_TEXTURE_USAGE_COPY_DST = 0x2;
+const GPU_TEXTURE_USAGE_RENDER_ATTACHMENT = 0x10;
+
 const UNIFORM_BUFFER_SIZE_BYTES = 64; // 16 floats — see struct layout in WGSL_SHADER_SOURCE below.
 const UNIFORM_FLOAT_COUNT = UNIFORM_BUFFER_SIZE_BYTES / 4;
+
+// canvasSize, translate, scale, rotation, opacity, boundsOrigin, boundsSize — see TEXTURED_WGSL_SHADER_SOURCE.
+const TEXTURED_UNIFORM_BUFFER_SIZE_BYTES = 48; // 12 floats.
+const TEXTURED_UNIFORM_FLOAT_COUNT = TEXTURED_UNIFORM_BUFFER_SIZE_BYTES / 4;
 
 const UNIT_QUAD = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
 
@@ -134,6 +170,56 @@ fn fs_main() -> @location(0) vec4<f32> {
 }
 `;
 
+/**
+ * Textured variant — identical transform math to `WGSL_SHADER_SOURCE`, plus
+ * a sampler/texture binding and a `uv` varying derived directly from the
+ * unit quad (Y-flipped: image/video pixel data is top-left origin, WebGPU
+ * texture coordinates are top-left too for `textureSample`, but the quad's
+ * own Y already runs top-to-bottom in this system's convention — flipped to
+ * match `webgl2-backend.ts`'s identical derivation for consistent output
+ * between the two backends).
+ */
+const TEXTURED_WGSL_SHADER_SOURCE = `
+struct TexturedUniforms {
+  canvasSize: vec2<f32>,
+  translate: vec2<f32>,
+  scale: vec2<f32>,
+  rotation: f32,
+  opacity: f32,
+  boundsOrigin: vec2<f32>,
+  boundsSize: vec2<f32>,
+};
+@group(0) @binding(0) var<uniform> u: TexturedUniforms;
+@group(0) @binding(1) var mySampler: sampler;
+@group(0) @binding(2) var myTexture: texture_2d<f32>;
+
+struct VertexOutput {
+  @builtin(position) position: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+};
+
+@vertex
+fn vs_main(@location(0) unitQuad: vec2<f32>) -> VertexOutput {
+  let local = u.boundsOrigin + unitQuad * u.boundsSize;
+  let scaled = local * u.scale;
+  let c = cos(u.rotation);
+  let s = sin(u.rotation);
+  let rotated = vec2<f32>(scaled.x * c - scaled.y * s, scaled.x * s + scaled.y * c);
+  let world = rotated + u.translate;
+  let ndc = (world / u.canvasSize) * 2.0 - vec2<f32>(1.0, 1.0);
+  var out: VertexOutput;
+  out.position = vec4<f32>(ndc.x, -ndc.y, 0.0, 1.0);
+  out.uv = vec2<f32>(unitQuad.x, 1.0 - unitQuad.y);
+  return out;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+  let texColor = textureSample(myTexture, mySampler, in.uv);
+  return vec4<f32>(texColor.rgb, texColor.a * u.opacity);
+}
+`;
+
 /** WebGPU backend — the primary rung (`05-rendering-engine/webgpu.md`), confirmed solid 2026 browser support. */
 export class WebGPURenderBackend implements IRenderBackend {
   readonly kind = RenderBackend.WebGPU;
@@ -142,11 +228,18 @@ export class WebGPURenderBackend implements IRenderBackend {
   private device: IGPUDevice | null = null;
   private canvasContext: IGPUCanvasContext | null = null;
   private pipeline: IGPURenderPipeline | null = null;
+  private texturedPipeline: IGPURenderPipeline | null = null;
   private vertexBuffer: IGPUBuffer | null = null;
   private uniformBuffer: IGPUBuffer | null = null;
+  private texturedUniformBuffer: IGPUBuffer | null = null;
   private bindGroup: IGPUBindGroup | null = null;
+  private sampler: IGPUSampler | null = null;
   private width = 0;
   private height = 0;
+  private readonly textureCache = new Map<
+    AssetId,
+    { texture: IGPUTexture; bindGroup: IGPUBindGroup; uploaded: boolean; isLive: boolean }
+  >();
 
   constructor(dependencies: IWebGPUBackendDependencies) {
     this.dependencies = dependencies;
@@ -175,6 +268,20 @@ export class WebGPURenderBackend implements IRenderBackend {
       primitive: { topology: "triangle-strip" },
     });
 
+    const texturedShaderModule = device.createShaderModule({ code: TEXTURED_WGSL_SHADER_SOURCE });
+    const texturedPipeline = device.createRenderPipeline({
+      layout: "auto",
+      vertex: {
+        module: texturedShaderModule,
+        entryPoint: "vs_main",
+        buffers: [
+          { arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: "float32x2" }] },
+        ],
+      },
+      fragment: { module: texturedShaderModule, entryPoint: "fs_main", targets: [{ format }] },
+      primitive: { topology: "triangle-strip" },
+    });
+
     const vertexBuffer = device.createBuffer({
       size: UNIT_QUAD.byteLength,
       usage: GPU_BUFFER_USAGE_VERTEX | GPU_BUFFER_USAGE_COPY_DST,
@@ -190,18 +297,31 @@ export class WebGPURenderBackend implements IRenderBackend {
       entries: [{ binding: 0, resource: { buffer: uniformBuffer } }],
     });
 
+    const texturedUniformBuffer = device.createBuffer({
+      size: TEXTURED_UNIFORM_BUFFER_SIZE_BYTES,
+      usage: GPU_BUFFER_USAGE_UNIFORM | GPU_BUFFER_USAGE_COPY_DST,
+    });
+    const sampler = device.createSampler({
+      magFilter: "linear",
+      minFilter: "linear",
+      addressModeU: "clamp-to-edge",
+      addressModeV: "clamp-to-edge",
+    });
+
     this.device = device;
     this.canvasContext = canvasContext;
     this.pipeline = pipeline;
+    this.texturedPipeline = texturedPipeline;
     this.vertexBuffer = vertexBuffer;
     this.uniformBuffer = uniformBuffer;
+    this.texturedUniformBuffer = texturedUniformBuffer;
     this.bindGroup = bindGroup;
+    this.sampler = sampler;
   }
 
   drawFrame(sceneGraph: ISceneGraph): void {
     const device = this.requireDevice();
     const canvasContext = this.requireCanvasContext();
-    const pipeline = this.requirePipeline();
     const encoder = device.createCommandEncoder();
     const view = canvasContext.getCurrentTexture().createView();
 
@@ -210,13 +330,10 @@ export class WebGPURenderBackend implements IRenderBackend {
         { view, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: "clear", storeOp: "store" },
       ],
     });
-    pass.setPipeline(pipeline);
     pass.setVertexBuffer(0, this.vertexBuffer as IGPUBuffer);
-    pass.setBindGroup(0, this.bindGroup as IGPUBindGroup);
 
     for (const node of sortRenderQueue(sceneGraph.nodes)) {
-      this.writeUniforms(device, node);
-      pass.draw(4);
+      this.drawNode(device, pass, node);
     }
 
     pass.end();
@@ -227,9 +344,85 @@ export class WebGPURenderBackend implements IRenderBackend {
     this.device = null;
     this.canvasContext = null;
     this.pipeline = null;
+    this.texturedPipeline = null;
     this.vertexBuffer = null;
     this.uniformBuffer = null;
+    this.texturedUniformBuffer = null;
     this.bindGroup = null;
+    this.sampler = null;
+    this.textureCache.clear();
+  }
+
+  private drawNode(device: IGPUDevice, pass: IGPURenderPassEncoder, node: ISceneGraphNode): void {
+    const texture = node.texture?.kind === "image-source" ? node.texture : undefined;
+    if (texture && node.assetId !== undefined) {
+      this.drawTexturedNode(device, pass, node, node.assetId, texture);
+    } else {
+      this.drawFlatNode(device, pass, node);
+    }
+  }
+
+  private drawFlatNode(
+    device: IGPUDevice,
+    pass: IGPURenderPassEncoder,
+    node: ISceneGraphNode,
+  ): void {
+    pass.setPipeline(this.requirePipeline());
+    pass.setBindGroup(0, this.bindGroup as IGPUBindGroup);
+    this.writeUniforms(device, node);
+    pass.draw(4);
+  }
+
+  private drawTexturedNode(
+    device: IGPUDevice,
+    pass: IGPURenderPassEncoder,
+    node: ISceneGraphNode,
+    assetId: AssetId,
+    texture: Extract<ITextureSource, { kind: "image-source" }>,
+  ): void {
+    const bindGroup = this.getOrCreateTextureBindGroup(device, assetId, texture);
+    pass.setPipeline(this.requireTexturedPipeline());
+    pass.setBindGroup(0, bindGroup);
+    this.writeTexturedUniforms(device, node);
+    pass.draw(4);
+  }
+
+  /** Uploads once for a static image, re-uploads every call for a live video frame — see `ITextureSource.isLive`. */
+  private getOrCreateTextureBindGroup(
+    device: IGPUDevice,
+    assetId: AssetId,
+    texture: Extract<ITextureSource, { kind: "image-source" }>,
+  ): IGPUBindGroup {
+    let entry = this.textureCache.get(assetId);
+    if (!entry) {
+      const gpuTexture = device.createTexture({
+        size: { width: texture.width, height: texture.height },
+        format: "rgba8unorm",
+        usage:
+          GPU_TEXTURE_USAGE_TEXTURE_BINDING |
+          GPU_TEXTURE_USAGE_COPY_DST |
+          GPU_TEXTURE_USAGE_RENDER_ATTACHMENT,
+      });
+      const bindGroup = device.createBindGroup({
+        layout: this.requireTexturedPipeline().getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.texturedUniformBuffer as IGPUBuffer } },
+          { binding: 1, resource: this.requireSampler() },
+          { binding: 2, resource: gpuTexture.createView() },
+        ],
+      });
+      entry = { texture: gpuTexture, bindGroup, uploaded: false, isLive: texture.isLive };
+      this.textureCache.set(assetId, entry);
+    }
+    if (!entry.uploaded || entry.isLive) {
+      device.queue.copyExternalImageToTexture(
+        { source: texture.source },
+        { texture: entry.texture },
+        { width: texture.width, height: texture.height },
+      );
+      entry.uploaded = true;
+    }
+    return entry.bindGroup;
   }
 
   private writeUniforms(device: IGPUDevice, node: ISceneGraphNode): void {
@@ -255,6 +448,24 @@ export class WebGPURenderBackend implements IRenderBackend {
     device.queue.writeBuffer(this.uniformBuffer as IGPUBuffer, 0, data);
   }
 
+  private writeTexturedUniforms(device: IGPUDevice, node: ISceneGraphNode): void {
+    const { transform, bounds } = node;
+    const data = new Float32Array(TEXTURED_UNIFORM_FLOAT_COUNT);
+    data[0] = this.width;
+    data[1] = this.height;
+    data[2] = transform.x;
+    data[3] = transform.y;
+    data[4] = transform.scaleX;
+    data[5] = transform.scaleY;
+    data[6] = transform.rotation;
+    data[7] = node.opacity;
+    data[8] = bounds.x - transform.anchorX;
+    data[9] = bounds.y - transform.anchorY;
+    data[10] = bounds.width;
+    data[11] = bounds.height;
+    device.queue.writeBuffer(this.texturedUniformBuffer as IGPUBuffer, 0, data);
+  }
+
   private requireDevice(): IGPUDevice {
     if (!this.device) {
       throw new Error("WebGPURenderBackend: drawFrame called before init()");
@@ -274,5 +485,19 @@ export class WebGPURenderBackend implements IRenderBackend {
       throw new Error("WebGPURenderBackend: drawFrame called before init()");
     }
     return this.pipeline;
+  }
+
+  private requireTexturedPipeline(): IGPURenderPipeline {
+    if (!this.texturedPipeline) {
+      throw new Error("WebGPURenderBackend: drawFrame called before init()");
+    }
+    return this.texturedPipeline;
+  }
+
+  private requireSampler(): IGPUSampler {
+    if (!this.sampler) {
+      throw new Error("WebGPURenderBackend: drawFrame called before init()");
+    }
+    return this.sampler;
   }
 }

@@ -8,14 +8,17 @@ import type {
   IGPUDevice,
   IGPURenderPassEncoder,
   IGPURenderPipeline,
+  IGPUSampler,
   IGPUShaderModule,
+  IGPUTexture,
   IGPUTextureView,
 } from "../webgpu-backend";
 
 export type FakeGPUCall =
   | { op: "writeBuffer"; byteOffset: number; data: Float32Array }
   | { op: "submit" }
-  | { op: "draw"; vertexCount: number };
+  | { op: "draw"; vertexCount: number }
+  | { op: "copyExternalImageToTexture"; source: CanvasImageSource };
 
 /**
  * Minimal, always-succeeding fake of the WebGPU device/canvas-context pair
@@ -33,6 +36,9 @@ export class FakeWebGPUDevice implements IGPUDevice {
     submit: (): void => {
       this.calls.push({ op: "submit" });
     },
+    copyExternalImageToTexture: (source: { source: CanvasImageSource }): void => {
+      this.calls.push({ op: "copyExternalImageToTexture", source: source.source });
+    },
   };
 
   createShaderModule(): IGPUShaderModule {
@@ -48,6 +54,14 @@ export class FakeWebGPUDevice implements IGPUDevice {
   }
 
   createBindGroup(): IGPUBindGroup {
+    return {};
+  }
+
+  createTexture(): IGPUTexture {
+    return { createView: (): IGPUTextureView => ({}) };
+  }
+
+  createSampler(): IGPUSampler {
     return {};
   }
 
