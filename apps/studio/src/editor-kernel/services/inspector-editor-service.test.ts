@@ -36,6 +36,29 @@ describe("InspectorEditorService", () => {
     expect(layerEngine.registry.get(layerId)?.opacity).toBe(1);
   });
 
+  it("applies a batched transform patch as one undo step", () => {
+    service.setLayerTransform({
+      type: "SetLayerTransform",
+      payload: { layerId, transform: { x: 50, y: 60, scaleX: 2, scaleY: 2 } },
+    });
+    expect(layerEngine.registry.get(layerId)?.transform).toMatchObject({
+      x: 50,
+      y: 60,
+      scaleX: 2,
+      scaleY: 2,
+    });
+    expect(commandBus.canUndo).toBe(true);
+
+    commandBus.undo();
+    expect(layerEngine.registry.get(layerId)?.transform).toMatchObject({
+      x: 0,
+      y: 0,
+      scaleX: 1,
+      scaleY: 1,
+    });
+    expect(commandBus.canUndo).toBe(false);
+  });
+
   it("creates the Clip and PropertyTrack for a Layer's first keyframe", () => {
     service.addKeyframe({
       type: "AddKeyframe",

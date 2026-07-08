@@ -1,4 +1,9 @@
-import { createAnimationClipId, createPropertyTrackId, type ICommand } from "@motion-studio/shared";
+import {
+  createAnimationClipId,
+  createPropertyTrackId,
+  type ICommand,
+  type ITransform2D,
+} from "@motion-studio/shared";
 import { CompositeCommand } from "@motion-studio/history";
 import {
   createAnimationClip,
@@ -12,7 +17,11 @@ import type { CommandBus } from "../command-bus";
 import { AddAnimationClipCommand } from "../commands/add-animation-clip-command";
 import { AddPropertyTrackCommand } from "../commands/add-property-track-command";
 import { UpdateLayerCommand } from "../commands/update-layer-command";
-import type { IAddKeyframeIntent, ISetLayerPropertyIntent } from "../intents";
+import type {
+  IAddKeyframeIntent,
+  ISetLayerPropertyIntent,
+  ISetLayerTransformIntent,
+} from "../intents";
 
 /** Resolves Inspector-shaped Intents (static edits + keyframing) into Commands. See `TimelineEditorService`'s doc comment on staying a thin façade. */
 export class InspectorEditorService {
@@ -27,6 +36,25 @@ export class InspectorEditorService {
     this.commandBus.execute(
       new UpdateLayerCommand(crypto.randomUUID(), this.layerEngine, layerId, propertyKey, value),
     );
+  }
+
+  /** Batched transform patch — one undo step for every changed field (e.g. a Canvas drag-resize/move gesture), unlike `setLayerProperty`'s single key. */
+  setLayerTransform(intent: ISetLayerTransformIntent): void {
+    const { layerId, transform } = intent.payload;
+    const commands = (Object.keys(transform) as Array<keyof ITransform2D>).map(
+      (key) =>
+        new UpdateLayerCommand(
+          crypto.randomUUID(),
+          this.layerEngine,
+          layerId,
+          `transform.${key}`,
+          transform[key],
+        ),
+    );
+    if (commands.length === 0) {
+      return;
+    }
+    this.commandBus.execute(new CompositeCommand(crypto.randomUUID(), "Transform layer", commands));
   }
 
   /** Adds a keyframe, creating the Clip and/or PropertyTrack it needs first if this is the property's first keyframe. */
