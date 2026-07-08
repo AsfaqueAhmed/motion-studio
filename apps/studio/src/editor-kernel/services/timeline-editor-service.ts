@@ -17,6 +17,7 @@ import {
 import {
   DeleteTrackItemCommand,
   MoveTrackItemCommand,
+  UpdateCompositionSizeCommand,
   createTrackItem,
   type TimelineEngine,
 } from "@motion-studio/timeline";
@@ -29,6 +30,7 @@ import type {
   IAddClipFromAssetIntent,
   IDeleteSelectionIntent,
   IMoveTrackItemIntent,
+  ISetCompositionSizeIntent,
 } from "../intents";
 
 /**
@@ -106,6 +108,19 @@ export class TimelineEditorService {
     );
     this.commandBus.execute(
       new CompositeCommand(crypto.randomUUID(), "Delete selection", commands),
+    );
+  }
+
+  setCompositionSize(intent: ISetCompositionSizeIntent): void {
+    const { compositionId, width, height } = intent.payload;
+    this.commandBus.execute(
+      new UpdateCompositionSizeCommand(
+        crypto.randomUUID(),
+        this.timelineEngine,
+        compositionId,
+        width,
+        height,
+      ),
     );
   }
 

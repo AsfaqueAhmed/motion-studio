@@ -203,4 +203,25 @@ describe("TimelineEngine", () => {
 
     expect(() => engine.trimTrackItem(item.id, "in", toTick(900))).toThrow(/non-positive/);
   });
+
+  it("setCompositionSize updates the composition's width/height", () => {
+    const { engine, composition } = setup();
+
+    engine.setCompositionSize(composition.id, 1080, 1920);
+
+    expect(engine.requireComposition(composition.id)).toMatchObject({
+      width: 1080,
+      height: 1920,
+    });
+  });
+
+  it("setCompositionSize rejects non-positive or non-integer dimensions", () => {
+    const { engine, composition } = setup();
+
+    expect(() => engine.setCompositionSize(composition.id, 0, 1080)).toThrow(/positive integers/);
+    expect(() => engine.setCompositionSize(composition.id, 1920, -1)).toThrow(/positive integers/);
+    expect(() => engine.setCompositionSize(composition.id, 1920.5, 1080)).toThrow(
+      /positive integers/,
+    );
+  });
 });

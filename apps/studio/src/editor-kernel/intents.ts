@@ -1,6 +1,7 @@
 import type {
   AssetId,
   AssetType,
+  CompositionId,
   IIntent,
   LayerId,
   LayerType,
@@ -43,6 +44,11 @@ export type IMoveTrackItemIntent = IIntent<
 export type IDeleteSelectionIntent = IIntent<
   "DeleteSelection",
   { readonly trackItemIds: readonly TrackItemId[] }
+>;
+
+export type ISetCompositionSizeIntent = IIntent<
+  "SetCompositionSize",
+  { readonly compositionId: CompositionId; readonly width: number; readonly height: number }
 >;
 
 export type ISetLayerPropertyIntent = IIntent<

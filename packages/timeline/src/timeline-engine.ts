@@ -38,6 +38,18 @@ export class TimelineEngine implements IEngine {
     this.trackItems.clear();
   }
 
+  /** Updates the output frame size (`docs/07-timeline-engine/overview.md`'s "dimensions"). Preview and export both read `IComposition.width`/`height` directly, so this is the one place that needs to change. */
+  setCompositionSize(id: CompositionId, width: number, height: number): void {
+    if (!Number.isInteger(width) || width <= 0 || !Number.isInteger(height) || height <= 0) {
+      throw new Error(
+        `TimelineEngine: composition size must be positive integers, got ${width}x${height}.`,
+      );
+    }
+    const composition = this.requireComposition(id);
+    composition.width = width;
+    composition.height = height;
+  }
+
   addTrack(compositionId: CompositionId, track: ITrack): void {
     const composition = this.requireComposition(compositionId);
     this.tracks.add(track);

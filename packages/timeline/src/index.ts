@@ -10,3 +10,4 @@ export * from "./commands/trim-track-item-command";
 export * from "./commands/split-track-item-command";
 export * from "./commands/delete-track-item-command";
 export * from "./commands/ripple-delete-command";
+export * from "./commands/update-composition-size-command";

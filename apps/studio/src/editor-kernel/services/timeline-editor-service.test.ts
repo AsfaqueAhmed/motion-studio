@@ -158,4 +158,22 @@ describe("TimelineEditorService", () => {
     expect(timelineEngine.trackItems.has(trackItemId)).toBe(false);
     expect(layerEngine.registry.has(layerId)).toBe(true);
   });
+
+  it("changes the composition's frame size and undoes back to the previous one", () => {
+    service.setCompositionSize({
+      type: "SetCompositionSize",
+      payload: { compositionId, width: 1080, height: 1920 },
+    });
+
+    expect(timelineEngine.requireComposition(compositionId)).toMatchObject({
+      width: 1080,
+      height: 1920,
+    });
+
+    commandBus.undo();
+    expect(timelineEngine.requireComposition(compositionId)).toMatchObject({
+      width: 100,
+      height: 100,
+    });
+  });
 });
