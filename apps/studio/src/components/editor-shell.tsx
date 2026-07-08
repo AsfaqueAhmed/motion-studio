@@ -57,11 +57,14 @@ function handleDragEnd(kernel: EditorKernel, event: DragEndEvent): void {
         type: "AddClipFromAsset",
         payload: {
           trackId: overData.trackId,
+          compositionId: kernel.defaultCompositionId,
           assetId: activeData.assetId,
           assetType: activeData.assetType,
           name: activeData.name,
           startTick: toTick(pixelOffset * ticksPerPixel),
           durationTicks: secondsToTicks(DEFAULT_CLIP_DURATION_SECONDS, composition.fps),
+          assetWidth: activeData.width,
+          assetHeight: activeData.height,
         },
       });
     } catch (error) {

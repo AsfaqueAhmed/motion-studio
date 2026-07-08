@@ -82,11 +82,14 @@ describe("TimelineEditorService", () => {
       type: "AddClipFromAsset",
       payload: {
         trackId,
+        compositionId,
         assetId: createAssetId("asset-1"),
         assetType: AssetType.Image,
         name: "Photo",
         startTick: toTick(0),
         durationTicks: toTick(90),
+        assetWidth: undefined,
+        assetHeight: undefined,
       },
     });
 
@@ -106,11 +109,14 @@ describe("TimelineEditorService", () => {
         type: "AddClipFromAsset",
         payload: {
           trackId,
+          compositionId,
           assetId: createAssetId("asset-2"),
           assetType: AssetType.Font,
           name: "Font",
           startTick: toTick(0),
           durationTicks: toTick(90),
+          assetWidth: undefined,
+          assetHeight: undefined,
         },
       }),
     ).toThrow(/cannot be placed/);
@@ -121,11 +127,14 @@ describe("TimelineEditorService", () => {
       type: "AddClipFromAsset",
       payload: {
         trackId,
+        compositionId,
         assetId: createAssetId("asset-3"),
         assetType: AssetType.Image,
         name: "Photo",
         startTick: toTick(0),
         durationTicks: toTick(90),
+        assetWidth: undefined,
+        assetHeight: undefined,
       },
     });
 
@@ -144,11 +153,14 @@ describe("TimelineEditorService", () => {
       type: "AddClipFromAsset",
       payload: {
         trackId,
+        compositionId,
         assetId: createAssetId("asset-4"),
         assetType: AssetType.Image,
         name: "Photo",
         startTick: toTick(0),
         durationTicks: toTick(90),
+        assetWidth: undefined,
+        assetHeight: undefined,
       },
     });
     const layerId = timelineEngine.requireTrackItem(trackItemId).layerId;
@@ -157,6 +169,58 @@ describe("TimelineEditorService", () => {
 
     expect(timelineEngine.trackItems.has(trackItemId)).toBe(false);
     expect(layerEngine.registry.has(layerId)).toBe(true);
+  });
+
+  it("contain-fits and centers a newly created layer to the composition frame", () => {
+    // Composition is 100x100; asset is 200x400 (portrait) — contain-fit
+    // scale is min(100/200, 100/400) = 0.25, centered at (50, 50), anchored
+    // at the asset's own center (100, 200).
+    const trackItemId = service.addClipFromAsset({
+      type: "AddClipFromAsset",
+      payload: {
+        trackId,
+        compositionId,
+        assetId: createAssetId("asset-5"),
+        assetType: AssetType.Image,
+        name: "Portrait",
+        startTick: toTick(0),
+        durationTicks: toTick(90),
+        assetWidth: 200,
+        assetHeight: 400,
+      },
+    });
+
+    const item = timelineEngine.requireTrackItem(trackItemId);
+    const layer = layerEngine.registry.get(item.layerId);
+    expect(layer?.transform).toMatchObject({
+      x: 50,
+      y: 50,
+      scaleX: 0.25,
+      scaleY: 0.25,
+      anchorX: 100,
+      anchorY: 200,
+    });
+  });
+
+  it("leaves a layer at the default transform when asset dimensions are unknown (e.g. Audio)", () => {
+    const trackItemId = service.addClipFromAsset({
+      type: "AddClipFromAsset",
+      payload: {
+        trackId,
+        compositionId,
+        assetId: createAssetId("asset-6"),
+        assetType: AssetType.Audio,
+        name: "Track",
+        startTick: toTick(0),
+        durationTicks: toTick(90),
+        assetWidth: undefined,
+        assetHeight: undefined,
+      },
+    });
+
+    const item = timelineEngine.requireTrackItem(trackItemId);
+    const layer = layerEngine.registry.get(item.layerId);
+    expect(layer?.transform).toMatchObject({ x: 0, y: 0, scaleX: 1, scaleY: 1 });
   });
 
   it("changes the composition's frame size and undoes back to the previous one", () => {

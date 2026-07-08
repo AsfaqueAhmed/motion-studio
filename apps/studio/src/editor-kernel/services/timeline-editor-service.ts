@@ -4,6 +4,7 @@ import {
   createTrackItemId,
   type AssetId,
   type ILayer,
+  type ITransform2D,
   type LayerId,
   type TrackItemId,
 } from "@motion-studio/shared";
@@ -50,11 +51,28 @@ export class TimelineEditorService {
 
   /** Creates a Layer for the given asset and places it as a new TrackItem — one undo step for all three effects. */
   addClipFromAsset(intent: IAddClipFromAssetIntent): TrackItemId {
-    const { trackId, assetId, assetType, name, startTick, durationTicks } = intent.payload;
+    const {
+      trackId,
+      compositionId,
+      assetId,
+      assetType,
+      name,
+      startTick,
+      durationTicks,
+      assetWidth,
+      assetHeight,
+    } = intent.payload;
     const layerId = createLayerId(crypto.randomUUID());
     const trackItemId = createTrackItemId(crypto.randomUUID());
 
-    const layer = this.createLayerForAsset(layerId, name, assetId, assetType);
+    const composition = this.timelineEngine.requireComposition(compositionId);
+    const transform = computeFitTransform(
+      assetWidth,
+      assetHeight,
+      composition.width,
+      composition.height,
+    );
+    const layer = this.createLayerForAsset(layerId, name, assetId, assetType, transform);
     const trackItem = createTrackItem({
       id: trackItemId,
       trackId,
@@ -129,12 +147,13 @@ export class TimelineEditorService {
     name: string,
     assetId: AssetId,
     assetType: AssetType,
+    transform: Partial<ITransform2D> | undefined,
   ): ILayer {
     switch (assetType) {
       case AssetType.Video:
-        return createVideoLayer({ id: layerId, name, assetId });
+        return createVideoLayer({ id: layerId, name, assetId, ...(transform && { transform }) });
       case AssetType.Image:
-        return createImageLayer({ id: layerId, name, assetId });
+        return createImageLayer({ id: layerId, name, assetId, ...(transform && { transform }) });
       case AssetType.Audio:
         return createAudioLayer({ id: layerId, name, assetId });
       case AssetType.Font:
@@ -144,4 +163,33 @@ export class TimelineEditorService {
         );
     }
   }
+}
+
+/**
+ * Contain-fit, centered, anchored at the asset's own visual center — the
+ * `IImageLayer.fitMode: "contain"` default finally has bounds/transform
+ * math behind it, instead of every layer landing at `DEFAULT_TRANSFORM`
+ * (native pixel size, pinned to the frame's top-left corner) regardless of
+ * how it compares to the composition's actual size. `undefined` in/out
+ * (e.g. Audio, which has no visual bounds) keeps the layer at
+ * `DEFAULT_TRANSFORM` unchanged.
+ */
+function computeFitTransform(
+  assetWidth: number | undefined,
+  assetHeight: number | undefined,
+  compositionWidth: number,
+  compositionHeight: number,
+): Partial<ITransform2D> | undefined {
+  if (!assetWidth || !assetHeight) {
+    return undefined;
+  }
+  const scale = Math.min(compositionWidth / assetWidth, compositionHeight / assetHeight);
+  return {
+    x: compositionWidth / 2,
+    y: compositionHeight / 2,
+    scaleX: scale,
+    scaleY: scale,
+    anchorX: assetWidth / 2,
+    anchorY: assetHeight / 2,
+  };
 }

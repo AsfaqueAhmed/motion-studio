@@ -25,3 +25,4 @@
 - [M11 CapCut-style UI reskin](project_m11_ui_reskin.md) — IconRail/LeftPanel/PlaybackBar added, Inspector now a contextual overlay (only mounts on selection), Effects/Captions/etc. tabs are placeholder-only
 - [Commit cadence](feedback_commit_cadence.md) — Commit after every message with file changes, don't batch into one final commit
 - [Dev server cadence](feedback_dev_server_cadence.md) — Always run apps/studio dev server on port 3000, restart it after every commit
+- [Canvas texture pipeline](project_canvas_texture_pipeline.md) — Real image/video rendering across all 4 backends (canvas-ui-refactoring branch), ITextureSource/Provider shapes, WebGPU multi-node uniform-buffer risk found but not fixed

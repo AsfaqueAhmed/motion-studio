@@ -3,6 +3,7 @@ import type {
   AssetType,
   CompositionId,
   IIntent,
+  ITransform2D,
   LayerId,
   LayerType,
   Tick,
@@ -28,11 +29,15 @@ export type IAddClipFromAssetIntent = IIntent<
   "AddClipFromAsset",
   {
     readonly trackId: TrackId;
+    readonly compositionId: CompositionId;
     readonly assetId: AssetId;
     readonly assetType: AssetType;
     readonly name: string;
     readonly startTick: Tick;
     readonly durationTicks: Tick;
+    /** Present for Image/Video only — lets the service auto-fit the new layer to the composition frame. */
+    readonly assetWidth: number | undefined;
+    readonly assetHeight: number | undefined;
   }
 >;
 
@@ -54,6 +59,12 @@ export type ISetCompositionSizeIntent = IIntent<
 export type ISetLayerPropertyIntent = IIntent<
   "SetLayerProperty",
   { readonly layerId: LayerId; readonly propertyKey: string; readonly value: unknown }
+>;
+
+/** Batched transform patch — one undo step for several changed fields at once (e.g. a Canvas drag-resize/move gesture), unlike `SetLayerProperty`'s single key. */
+export type ISetLayerTransformIntent = IIntent<
+  "SetLayerTransform",
+  { readonly layerId: LayerId; readonly transform: Partial<ITransform2D> }
 >;
 
 export type IAddKeyframeIntent = IIntent<

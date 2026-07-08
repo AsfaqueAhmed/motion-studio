@@ -53,7 +53,14 @@ function AssetTile({
   const thumbnailUrl = useAssetThumbnailUrl(kernel, entry);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `asset-${entry.id}`,
-    data: { type: "asset", assetId: entry.id, assetType: entry.type, name: entry.name },
+    data: {
+      type: "asset",
+      assetId: entry.id,
+      assetType: entry.type,
+      name: entry.name,
+      width: entry.width,
+      height: entry.height,
+    },
   });
 
   // The floating `DragOverlay` in `EditorShell` renders the drag preview
