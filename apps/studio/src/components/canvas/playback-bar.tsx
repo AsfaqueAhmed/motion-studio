@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Crop,
+  Diamond,
   Droplet,
   Minimize,
   Maximize,
@@ -19,6 +20,7 @@ import {
   MIN_ZOOM_TICKS_PER_PIXEL,
   MAX_ZOOM_TICKS_PER_PIXEL,
 } from "../../state/use-timeline-store";
+import { useEngineRevisionStore } from "../../state/use-engine-revision-store";
 import { formatTimecode } from "../../lib/format-timecode";
 
 const ZOOM_STEP = 1;
@@ -53,6 +55,7 @@ export function PlaybackBar(): JSX.Element {
   const setZoom = useTimelineStore((state) => state.setZoom);
   const selection = useTimelineStore((state) => state.selection);
   const clearSelection = useTimelineStore((state) => state.clearSelection);
+  useEngineRevisionStore((state) => state.revision);
   const [currentTick, setCurrentTick] = useState(kernel.playback.currentTick);
   const [isPlaying, setIsPlaying] = useState(
     kernel.playback.playbackState === PlaybackState.Playing,
@@ -100,6 +103,28 @@ export function PlaybackBar(): JSX.Element {
     clearSelection();
   };
 
+  const selectedLayerId = selection.layerIds[0];
+  const selectedLayer = selectedLayerId
+    ? kernel.layerEngine.registry.get(selectedLayerId)
+    : undefined;
+  // Whole-transform toggle: is there already a keyframe exactly at the
+  // playhead for the selected layer? Filled/accent when yes (clicking
+  // removes it), hollow/muted when no (clicking adds one) — same red-vs-
+  // white distinction as the reference CapCut UI.
+  const hasKeyframeHere =
+    selectedLayer !== undefined &&
+    kernel.animationEngine.getKeyframeTicksForLayer(selectedLayer.id).includes(currentTick);
+
+  const handleToggleKeyframe = (): void => {
+    if (!selectedLayer) {
+      return;
+    }
+    kernel.inspectorEditor.toggleKeyframe({
+      type: "ToggleKeyframe",
+      payload: { layerId: selectedLayer.id, layerType: selectedLayer.type, tick: currentTick },
+    });
+  };
+
   return (
     <div className="flex items-center justify-between border-t border-editor-border px-4 py-2 text-xs text-editor-text-muted">
       <div className="flex items-center gap-3">
@@ -138,6 +163,24 @@ export function PlaybackBar(): JSX.Element {
           {formatTimecode(currentTick, composition.fps)} |{" "}
           {formatTimecode(composition.durationTicks, composition.fps)}
         </span>
+        {selectedLayer && (
+          <button
+            type="button"
+            onClick={handleToggleKeyframe}
+            title={hasKeyframeHere ? "Remove keyframe" : "Add keyframe"}
+            className={
+              hasKeyframeHere
+                ? "rounded p-1 text-editor-accent hover:bg-editor-surface-raised"
+                : "rounded p-1 text-editor-text-muted hover:bg-editor-surface-raised"
+            }
+          >
+            <Diamond
+              className="h-4 w-4"
+              fill={hasKeyframeHere ? "currentColor" : "none"}
+              aria-hidden
+            />
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
