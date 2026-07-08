@@ -1,6 +1,7 @@
 import type { IAICapabilityAPI } from "./ai-capability-api";
 import type { IEffectsAPI } from "./effects-api";
 import type { IExportAPI } from "./export-api";
+import type { IToolInteractionAPI } from "./interaction-api";
 import type { IPanelAPI } from "./panel-api";
 import type { IToolAPI } from "./tool-api";
 
@@ -25,4 +26,5 @@ export interface IPluginAPI {
   readonly ai: IAICapabilityAPI | undefined;
   readonly tools: IToolAPI | undefined;
   readonly panels: IPanelAPI | undefined;
+  readonly interaction: IToolInteractionAPI | undefined;
 }

@@ -1,7 +1,14 @@
 import type { IPluginAPI } from "./plugin-api";
 
 /** One entry per `IPluginAPI` field — keep these two in sync. */
-export const PLUGIN_PERMISSIONS = ["effects", "export", "ai", "tools", "panels"] as const;
+export const PLUGIN_PERMISSIONS = [
+  "effects",
+  "export",
+  "ai",
+  "tools",
+  "panels",
+  "interaction",
+] as const;
 
 export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number];
 
@@ -43,5 +50,6 @@ export function buildScopedPluginAPI(
     ai: granted.has("ai") ? hostApi.ai : undefined,
     tools: granted.has("tools") ? hostApi.tools : undefined,
     panels: granted.has("panels") ? hostApi.panels : undefined,
+    interaction: granted.has("interaction") ? hostApi.interaction : undefined,
   };
 }
