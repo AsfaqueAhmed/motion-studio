@@ -73,7 +73,7 @@ export async function importAsset(
     const metadata = await deps.metadataExtractor.extract(input.data, type, input.mimeType);
 
     if (deps.thumbnailGenerator && deps.thumbnailStore) {
-      const thumbnail = await deps.thumbnailGenerator.generate(input.data, type);
+      const thumbnail = await deps.thumbnailGenerator.generate(input.data, type, input.mimeType);
       if (thumbnail) {
         await deps.thumbnailStore.put(assetId, toTick(0), thumbnail);
       }

@@ -75,6 +75,10 @@ export class FakeThumbnailStore implements IThumbnailStore {
     this.thumbnails.set(assetId, byTick);
   }
 
+  async get(assetId: AssetId, atTick: Tick): Promise<Uint8Array | undefined> {
+    return this.thumbnails.get(assetId)?.get(atTick);
+  }
+
   async deleteAllForAsset(assetId: AssetId): Promise<void> {
     this.thumbnails.delete(assetId);
   }

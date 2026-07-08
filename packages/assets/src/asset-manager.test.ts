@@ -1,4 +1,4 @@
-import { AssetType, createAssetId } from "@motion-studio/shared";
+import { AssetType, createAssetId, toTick } from "@motion-studio/shared";
 import { describe, expect, it } from "vitest";
 import { AssetCatalog } from "./asset-catalog";
 import { AssetManager } from "./asset-manager";
@@ -7,6 +7,7 @@ import {
   FakeAssetCatalogStore,
   FakeAssetEventSink,
   FakeMetadataExtractor,
+  FakeThumbnailGenerator,
   FakeThumbnailStore,
   FakeWaveformStore,
 } from "./test-support/fakes";
@@ -109,5 +110,37 @@ describe("AssetManager", () => {
     await manager.delete(unknownId);
 
     expect(events.events).toContainEqual({ type: "AssetDeleted", payload: { assetId: unknownId } });
+  });
+
+  it("getThumbnail() returns the thumbnail the import pipeline generated at tick 0", async () => {
+    const thumbnail = new Uint8Array([9, 9, 9]);
+    const manager = new AssetManager({
+      blobStore: new FakeAssetBlobStore(),
+      catalog: new AssetCatalog(new FakeAssetCatalogStore()),
+      metadataExtractor: new FakeMetadataExtractor(
+        () => ({ type: AssetType.Image, width: 1, height: 1 }) as never,
+      ),
+      thumbnailGenerator: new FakeThumbnailGenerator(thumbnail),
+      thumbnailStore: new FakeThumbnailStore(),
+    });
+    const entry = await manager.import({
+      fileName: "photo.png",
+      mimeType: "image/png",
+      data: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(await manager.getThumbnail(entry.id)).toEqual(thumbnail);
+    expect(await manager.getThumbnail(entry.id, toTick(30))).toBeUndefined();
+  });
+
+  it("getThumbnail() returns undefined when no thumbnail was ever stored", async () => {
+    const { manager } = makeManager();
+    const entry = await manager.import({
+      fileName: "photo.png",
+      mimeType: "image/png",
+      data: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(await manager.getThumbnail(entry.id)).toBeUndefined();
   });
 });

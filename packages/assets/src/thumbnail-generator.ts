@@ -9,5 +9,5 @@ import type { AssetType } from "@motion-studio/shared";
  * thumbnail per asset only.
  */
 export interface IThumbnailGenerator {
-  generate(data: Uint8Array, type: AssetType): Promise<Uint8Array | undefined>;
+  generate(data: Uint8Array, type: AssetType, mimeType: string): Promise<Uint8Array | undefined>;
 }

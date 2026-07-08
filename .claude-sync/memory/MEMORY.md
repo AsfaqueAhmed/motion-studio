@@ -21,4 +21,6 @@
 - [Architecture non-negotiables](project_architecture_rules.md) — UI/engine separation, Tick time, Frame State invariant, VFS-only storage access
 - [Docs update workflow](feedback_docs_workflow.md) — Fill stub docs as each engine is built; spikes update docs/13-export/ and docs/11-ai/ first
 - [Phase branching](feedback_phase_branching.md) — Create a new git branch named after the phase when starting each PLAN.md phase
-- [Manual verification](feedback_manual_verification.md) — Always drive real UI flows in a browser (Playwright/chromium-cli) before declaring a UI phase done; typecheck/lint/unit tests miss interaction-layer bugs
+- [Manual verification](feedback_manual_verification.md) — Flipped: user checks UI changes themselves now, don't self-verify with temporary Playwright scripts
+- [M11 CapCut-style UI reskin](project_m11_ui_reskin.md) — IconRail/LeftPanel/PlaybackBar added, Inspector now a contextual overlay (only mounts on selection), Effects/Captions/etc. tabs are placeholder-only
+- [Commit cadence](feedback_commit_cadence.md) — Commit after every message with file changes, don't batch into one final commit

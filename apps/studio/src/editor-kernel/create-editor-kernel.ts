@@ -5,7 +5,7 @@ import {
   createTrackId,
   secondsToTicks,
 } from "@motion-studio/shared";
-import { StorageEngine, AssetBlobStore } from "@motion-studio/storage";
+import { StorageEngine, AssetBlobStore, ThumbnailCache } from "@motion-studio/storage";
 import { AssetCatalog, AssetManager } from "@motion-studio/assets";
 import { LayerEngine } from "@motion-studio/layer";
 import { TimelineEngine, createComposition, createTrack } from "@motion-studio/timeline";
@@ -18,6 +18,7 @@ import {
 } from "@motion-studio/plugin";
 import { AssetCatalogRepository } from "./asset-catalog-repository";
 import { browserMetadataExtractor } from "./metadata-extractor";
+import { browserThumbnailGenerator } from "./thumbnail-generator";
 import { ToolRegistry } from "./tool-registry";
 import { EditorKernel } from "./editor-kernel";
 
@@ -47,6 +48,8 @@ export async function createEditorKernel(): Promise<EditorKernel> {
     blobStore,
     catalog,
     metadataExtractor: browserMetadataExtractor,
+    thumbnailGenerator: browserThumbnailGenerator,
+    thumbnailStore: new ThumbnailCache(storageEngine),
     events: appEngine.events,
   });
 

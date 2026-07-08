@@ -18,6 +18,7 @@ export interface IAssetBlobStore {
 /** Structurally matches `@motion-studio/storage`'s real `ThumbnailCache` (Phase 3/9-adjacent). */
 export interface IThumbnailStore {
   put(assetId: AssetId, atTick: Tick, data: Uint8Array): Promise<void>;
+  get(assetId: AssetId, atTick: Tick): Promise<Uint8Array | undefined>;
   deleteAllForAsset(assetId: AssetId): Promise<void>;
 }
 

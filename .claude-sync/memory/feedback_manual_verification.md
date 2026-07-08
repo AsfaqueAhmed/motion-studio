@@ -1,33 +1,35 @@
 ---
 name: feedback-manual-verification
-description: Always drive real UI flows in a browser before declaring a UI phase/feature done — typecheck/lint/unit tests miss interaction-layer bugs
+description: "User now checks UI changes manually — don't spin up temporary Playwright scripts to self-verify"
 metadata: 
   node_type: memory
   type: feedback
-  originSessionId: 66fa26d6-b112-4199-8deb-fa0a6d1e3f77
+  originSessionId: a7b23342-a807-457d-ac5b-e58fc3a226bd
 ---
 
-For any UI-touching phase in Motion Studio, drive the actual feature in a
-real browser (Playwright against a running dev server, or `chromium-cli`)
-before reporting it complete — don't stop at typecheck/lint/unit tests
-passing.
+Don't write ad-hoc/temporary Playwright scripts (screenshotting, clicking
+through flows, sampling pixel data) to self-verify a UI change works. Run
+typecheck/lint/existing test suites as normal, and start the dev server if the
+user needs it running — but stop short of writing one-off verification
+scripts (e.g. `scripts/tmp-*.mjs`). Leave the actual UI check to the user.
 
-**Why:** During Phase 15 (Editor UI), all 37 new unit tests passed and
-typecheck/lint/build were clean, but manual Playwright testing found a
-real bug unit tests couldn't have caught: dnd-kit's default `PointerSensor`
-has no activation distance, so a plain click on a Timeline clip registered
-as a completed zero-distance drag, silently pushing a no-op
-`MoveTrackItemCommand` onto the undo stack and swallowing the click event
-meant for selection. Undo then reverted the spurious no-op move instead of
-the user's actual last edit — completely invisible to any test that
-doesn't literally click a rendered clip and check what happens. Only
-caught by taking screenshots and sampling actual canvas pixel data /
-button states after real pointer interactions.
+**Why:** this was flipped from the opposite rule (always self-verify UI in a
+real browser) after several rounds of temporary Playwright screenshot/check
+scripts during the M11 CapCut-style UI reskin ([[project_m11_ui_reskin]]) —
+the user asked to check every change themselves from now on instead.
 
-**How to apply:** For any apps/studio UI work, after tests pass: start the
-dev server, use Playwright (or `chromium-cli` if available) to drive the
-actual user-facing flow end-to-end (not just "page loads"), take
-screenshots, and check state after each interaction (not just "no console
-errors" — that alone missed this bug too, since dnd-kit doesn't throw).
-Prefer verifying claims like "the rendering pipeline draws pixels" by
-sampling actual pixel data, not just confirming no exception was thrown.
+**Prior context, still useful background:** the original reason for
+self-verifying was that during Phase 15 (Editor UI), all unit tests and
+typecheck/lint passed clean, but manual Playwright testing caught a real bug
+tests couldn't: dnd-kit's default `PointerSensor` had no activation distance,
+so a plain click on a Timeline clip registered as a zero-distance drag,
+silently pushing a no-op `MoveTrackItemCommand` onto the undo stack. That
+class of bug (interaction-layer only, no console error) is still real — it's
+just the user's job to catch now, not something to proactively script around
+with temporary Playwright runs.
+
+**How to apply:** For apps/studio UI work, after tests pass, report the change
+as ready for the user to check rather than opening a browser automation
+script yourself. If the user asks you to verify something specific, or the
+change is high-risk/hard for them to exercise, that's a reasonable exception
+worth asking about rather than assuming.

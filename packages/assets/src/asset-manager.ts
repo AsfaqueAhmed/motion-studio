@@ -1,4 +1,5 @@
-import type { AssetId, IAssetsEngine } from "@motion-studio/shared";
+import type { AssetId, IAssetsEngine, Tick } from "@motion-studio/shared";
+import { toTick } from "@motion-studio/shared";
 import type { AssetCatalog, IAssetCatalogEntry } from "./asset-catalog";
 import { AssetDependencyGraph } from "./dependency-graph";
 import { importAsset, type IAssetEventSink, type IAssetImportInput } from "./import-pipeline";
@@ -51,6 +52,11 @@ export class AssetManager implements IAssetsEngine {
 
   list(): Promise<IAssetCatalogEntry[]> {
     return this.options.catalog.list();
+  }
+
+  /** The one representative thumbnail the import pipeline generates, stored at `toTick(0)` (see docs/14-assets/thumbnails.md). */
+  getThumbnail(assetId: AssetId, atTick: Tick = toTick(0)): Promise<Uint8Array | undefined> {
+    return this.options.thumbnailStore?.get(assetId, atTick) ?? Promise.resolve(undefined);
   }
 
   /**

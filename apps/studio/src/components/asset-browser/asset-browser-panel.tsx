@@ -2,9 +2,45 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
+import { Plus, Search } from "lucide-react";
 import type { IAssetCatalogEntry } from "@motion-studio/assets";
+import { AssetType } from "@motion-studio/shared";
 import { useEditorKernel } from "../editor-kernel-provider";
 import { useEngineRevisionStore } from "../../state/use-engine-revision-store";
+import { THUMBNAIL_MIME_TYPE } from "../../editor-kernel/thumbnail-generator";
+import type { EditorKernel } from "../../editor-kernel/editor-kernel";
+
+const THUMBNAIL_TYPES = new Set<AssetType>([AssetType.Video, AssetType.Image]);
+
+/** Fetches the asset's stored thumbnail (if any) and hands back an object URL, revoked on unmount/change. */
+function useAssetThumbnailUrl(kernel: EditorKernel, entry: IAssetCatalogEntry): string | undefined {
+  const [url, setUrl] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!THUMBNAIL_TYPES.has(entry.type)) {
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | undefined;
+    kernel.assetEditor.getThumbnail(entry.id).then((data) => {
+      if (cancelled || !data) {
+        return;
+      }
+      objectUrl = URL.createObjectURL(
+        new Blob([data as unknown as BlobPart], { type: THUMBNAIL_MIME_TYPE }),
+      );
+      setUrl(objectUrl);
+    });
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [kernel, entry.id, entry.type]);
+
+  return url;
+}
 
 function AssetTile({
   entry,
@@ -13,27 +49,56 @@ function AssetTile({
   entry: IAssetCatalogEntry;
   view: "grid" | "list";
 }): JSX.Element {
+  const kernel = useEditorKernel();
+  const thumbnailUrl = useAssetThumbnailUrl(kernel, entry);
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `asset-${entry.id}`,
     data: { type: "asset", assetId: entry.id, assetType: entry.type, name: entry.name },
   });
+
+  const style = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+  };
+
+  if (view === "list") {
+    return (
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        style={style}
+        className="flex cursor-grab items-center gap-2 rounded-lg border border-editor-border bg-editor-surface-raised px-2 py-1 text-xs"
+      >
+        {thumbnailUrl ? (
+          <img src={thumbnailUrl} alt="" className="h-6 w-6 shrink-0 rounded object-cover" />
+        ) : null}
+        <span className="truncate">{entry.name}</span>
+        <span className="text-editor-text-muted">{entry.type}</span>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      style={{
-        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-      }}
-      className={
-        view === "grid"
-          ? "flex aspect-square cursor-grab flex-col items-center justify-center rounded border border-editor-border bg-editor-surface-raised p-1 text-center text-[10px]"
-          : "flex cursor-grab items-center gap-2 rounded border border-editor-border bg-editor-surface-raised px-2 py-1 text-xs"
-      }
+      style={style}
+      className="relative flex aspect-square cursor-grab flex-col items-center justify-center gap-0.5 overflow-hidden rounded-lg border border-editor-border bg-editor-surface-raised p-1 text-center text-[10px]"
     >
-      <span className="truncate">{entry.name}</span>
-      <span className="text-editor-text-muted">{entry.type}</span>
+      {thumbnailUrl ? (
+        <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : null}
+      <div
+        className={
+          thumbnailUrl
+            ? "relative mt-auto flex w-full flex-col gap-0.5 bg-black/60 px-1 py-0.5"
+            : "flex flex-col gap-0.5"
+        }
+      >
+        <span className="truncate">{entry.name}</span>
+        <span className="text-editor-text-muted">{entry.type}</span>
+      </div>
     </div>
   );
 }
@@ -45,7 +110,7 @@ function AssetTile({
  * `AssetDeleted`), unlike the sync engines other panels read straight
  * through selectors.
  */
-export function AssetBrowserPanel(): JSX.Element {
+export function AssetBrowserPanel({ assetType }: { assetType?: AssetType }): JSX.Element {
   const kernel = useEditorKernel();
   const revision = useEngineRevisionStore((state) => state.revision);
   const [entries, setEntries] = useState<IAssetCatalogEntry[]>([]);
@@ -67,9 +132,9 @@ export function AssetBrowserPanel(): JSX.Element {
     };
   }, [kernel, revision, unusedOnly]);
 
-  const filtered = entries.filter((entry) =>
-    entry.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = entries
+    .filter((entry) => !assetType || entry.type === assetType)
+    .filter((entry) => entry.name.toLowerCase().includes(search.toLowerCase()));
 
   const handleImport = async (files: FileList | null): Promise<void> => {
     if (!files) {
@@ -86,14 +151,23 @@ export function AssetBrowserPanel(): JSX.Element {
   };
 
   return (
-    <aside className="flex flex-col gap-2 overflow-y-auto border-r border-editor-border bg-editor-surface p-2 text-xs">
-      <div className="flex items-center gap-1">
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-3 text-xs">
+      <div className="flex items-center gap-2 rounded-lg border border-editor-border bg-editor-bg px-2 py-1.5">
+        <Search className="h-3.5 w-3.5 text-editor-text-muted" aria-hidden />
+        <input
+          type="text"
+          placeholder="Search assets…"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          className="w-full bg-transparent text-editor-text placeholder:text-editor-text-muted focus:outline-none"
+        />
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="rounded bg-editor-surface-raised px-2 py-1"
+          title="Import"
+          className="shrink-0 rounded p-1 text-editor-text-muted hover:bg-editor-surface-raised"
         >
-          Import
+          <Plus className="h-3.5 w-3.5" aria-hidden />
         </button>
         <input
           ref={fileInputRef}
@@ -105,31 +179,25 @@ export function AssetBrowserPanel(): JSX.Element {
             event.target.value = "";
           }}
         />
+      </div>
+
+      <div className="flex items-center gap-2 text-editor-text-muted">
+        <label className="flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={unusedOnly}
+            onChange={(event) => setUnusedOnly(event.target.checked)}
+          />
+          Unused only
+        </label>
         <button
           type="button"
           onClick={() => setView(view === "grid" ? "list" : "grid")}
-          className="ml-auto rounded px-2 py-1 text-editor-text-muted hover:bg-editor-surface-raised"
+          className="ml-auto rounded px-2 py-1 hover:bg-editor-surface-raised"
         >
           {view === "grid" ? "List" : "Grid"}
         </button>
       </div>
-
-      <input
-        type="text"
-        placeholder="Search assets…"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        className="rounded border border-editor-border bg-editor-bg px-1 py-0.5"
-      />
-
-      <label className="flex items-center gap-1 text-editor-text-muted">
-        <input
-          type="checkbox"
-          checked={unusedOnly}
-          onChange={(event) => setUnusedOnly(event.target.checked)}
-        />
-        Unused only
-      </label>
 
       <div className={view === "grid" ? "grid grid-cols-2 gap-2" : "flex flex-col gap-1"}>
         {filtered.map((entry) => (
@@ -137,6 +205,6 @@ export function AssetBrowserPanel(): JSX.Element {
         ))}
         {filtered.length === 0 && <span className="text-editor-text-muted">No assets</span>}
       </div>
-    </aside>
+    </div>
   );
 }

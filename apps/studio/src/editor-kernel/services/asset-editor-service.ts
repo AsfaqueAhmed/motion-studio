@@ -24,6 +24,10 @@ export class AssetEditorService {
     return this.assetManager.listUnused();
   }
 
+  getThumbnail(assetId: AssetId): Promise<Uint8Array | undefined> {
+    return this.assetManager.getThumbnail(assetId);
+  }
+
   delete(assetId: AssetId): Promise<void> {
     return this.assetManager.delete(assetId);
   }
