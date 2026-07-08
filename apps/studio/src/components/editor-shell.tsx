@@ -61,17 +61,26 @@ function handleDragEnd(kernel: EditorKernel, event: DragEndEvent): void {
     const overRect = event.over?.rect;
     const pixelOffset = activeRect && overRect ? Math.max(0, activeRect.left - overRect.left) : 0;
     const composition = kernel.timelineEngine.requireComposition(kernel.defaultCompositionId);
-    kernel.timelineEditor.addClipFromAsset({
-      type: "AddClipFromAsset",
-      payload: {
-        trackId: overData.trackId,
-        assetId: activeData.assetId,
-        assetType: activeData.assetType,
-        name: activeData.name,
-        startTick: toTick(pixelOffset * ticksPerPixel),
-        durationTicks: secondsToTicks(DEFAULT_CLIP_DURATION_SECONDS, composition.fps),
-      },
-    });
+    // TimelineEngine.addTrackItem throws on overlap — a real, expected
+    // rejection (e.g. dropping onto a spot already covered by another
+    // clip), not a bug. Without this catch, the exception propagates
+    // through the dnd-kit event handler and crashes the whole app instead
+    // of just declining the drop.
+    try {
+      kernel.timelineEditor.addClipFromAsset({
+        type: "AddClipFromAsset",
+        payload: {
+          trackId: overData.trackId,
+          assetId: activeData.assetId,
+          assetType: activeData.assetType,
+          name: activeData.name,
+          startTick: toTick(pixelOffset * ticksPerPixel),
+          durationTicks: secondsToTicks(DEFAULT_CLIP_DURATION_SECONDS, composition.fps),
+        },
+      });
+    } catch (error) {
+      console.warn("EditorShell: drop rejected", error);
+    }
     return;
   }
 
@@ -86,10 +95,15 @@ function handleDragEnd(kernel: EditorKernel, event: DragEndEvent): void {
   if (overData.trackId === trackItem.trackId && toStartTick === trackItem.startTick) {
     return;
   }
-  kernel.timelineEditor.moveTrackItem({
-    type: "MoveTrackItem",
-    payload: { trackItemId: activeData.trackItemId, toTrackId: overData.trackId, toStartTick },
-  });
+  // Same overlap rejection as above, for repositioning an existing clip.
+  try {
+    kernel.timelineEditor.moveTrackItem({
+      type: "MoveTrackItem",
+      payload: { trackItemId: activeData.trackItemId, toTrackId: overData.trackId, toStartTick },
+    });
+  } catch (error) {
+    console.warn("EditorShell: move rejected", error);
+  }
 }
 
 /** Resolves a human-readable label for the floating `DragOverlay` preview. */
